@@ -4127,7 +4127,7 @@ static void HWR_DrawSpriteShadow(gr_vissprite_t *spr, GLPatch_t *gpatch, float t
 
 		// The shadow is falling ABOVE it's mobj?
 		// Don't draw it, then!
-		if (spr->mobj->z < floorheight)
+		if (interp.z < floorheight)
 			return;
 		else
 		{
@@ -4195,11 +4195,26 @@ static void HWR_DrawSpriteShadow(gr_vissprite_t *spr, GLPatch_t *gpatch, float t
 		swallVerts[1].z = spr->z2 + offset * gr_viewsin;
 	}
 
-	if (floorslope)
 	for (int i = 0; i < 4; i++)
 	{
-		slopez = P_GetZAt(floorslope, FLOAT_TO_FIXED(swallVerts[i].x), FLOAT_TO_FIXED(swallVerts[i].z));
-		swallVerts[i].y = FIXED_TO_FLOAT(slopez) + 0.05f;
+		float oldx = swallVerts[i].x;
+		float oldy = swallVerts[i].z;
+		float fx = FIXED_TO_FLOAT(interp.x);
+		float fy = FIXED_TO_FLOAT(interp.y);
+
+		if(cv_shadowposition.value)
+		{
+			if (cv_shadowposition.value == 1)
+			{
+				swallVerts[i].x = fx + ((oldx - fx) * gr_viewcos) - ((oldy - fy) * gr_viewsin);
+				swallVerts[i].z = fy + ((oldx - fx) * gr_viewsin) + ((oldy - fy) * gr_viewcos);
+			}
+			else
+			{
+				swallVerts[i].x = fx + ((oldx - fx) * gr_viewcos) + ((oldy - fy) * gr_viewsin);
+				swallVerts[i].z = fy + ((oldx - fx) * gr_viewsin) - ((oldy - fy) * gr_viewcos);
+			}
+		}
 	}
 
 	if (floorslope)

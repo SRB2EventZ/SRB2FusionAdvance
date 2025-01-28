@@ -407,7 +407,7 @@ static consvar_t cv_dummycontinues = {"dummycontinues", "0", CV_HIDEN, liveslimi
 static consvar_t cv_dummymares = {"dummymares", "Overall", CV_HIDEN|CV_CALL, dummymares_cons_t, Dummymares_OnChange, 0, NULL, NULL, 0, 0, NULL};
 
 static CV_PossibleValue_t textbox_cons_t[] = {{0, "Solid"}, {1, "GFZROCK"}, {0, NULL}};
-static consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
 // ==========================================================================
 // ORGANIZATION START.
 // ==========================================================================

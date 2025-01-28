@@ -2,7 +2,7 @@
 
 Fusion Advance is a custom build of Sonic Robo Blast 2, Version 2.1.25, forked from P-AS's [SRB2-Legacy build](https://github.com/P-AS/srb2-legacy), which is an attempt at an unofficial patch of Version 2.1, continuing where v2.1.25 left off, including essential fixes and QOL improvements seen in Version 2.2.
 
-This build is maintained by members of the [Super SRB2 Games Z community](https://supersrb2gamesz.github.io/), (a.k.a, 98% chromaticpipe, lol) and adds a host of new features from versions before and after Version 2.1.
+This build is maintained by members of the [Super SRB2 Games Z community](https://supersrb2gamesz.github.io/), (a.k.a, 99% chromaticpipe, lol) and adds a host of new features from versions before and after Version 2.1.
 
 # What does this build have that makes it stand out?
 

@@ -143,6 +143,7 @@ static CV_PossibleValue_t precipdensity_cons_t[] = {{0, "None"}, {1, "Light"}, {
 static CV_PossibleValue_t translucenthud_cons_t[] = {{0, "MIN"}, {10, "MAX"}, {0, NULL}};
 static CV_PossibleValue_t maxportals_cons_t[] = {{0, "MIN"}, {12, "MAX"}, {0, NULL}}; // lmao rendering 32 portals, you're a card
 static CV_PossibleValue_t homremoval_cons_t[] = {{0, "No"}, {1, "Yes"}, {2, "Flash"}, {0, NULL}};
+static CV_PossibleValue_t shadowposition_cons_t[] = {{0, "Static"}, {1, "Camera"}, {0, NULL}};
 
 static void ChaseCam_OnChange(void);
 static void ChaseCam2_OnChange(void);
@@ -158,6 +159,7 @@ consvar_t cv_flipcam = {"flipcam", "No", CV_SAVE|CV_CALL|CV_NOINIT, CV_YesNo, Fl
 consvar_t cv_flipcam2 = {"flipcam2", "No", CV_SAVE|CV_CALL|CV_NOINIT, CV_YesNo, FlipCam2_OnChange, 0, NULL, NULL, 0, 0, NULL};
 
 consvar_t cv_shadow = {"shadow", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_shadowposition = {"shadowposition", "Static", CV_SAVE, shadowposition_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_shadowoffs = {"offsetshadows", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_skybox = {"skybox", "On", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_soniccd = {"soniccd", "Off", CV_NETVAR, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
@@ -1362,6 +1364,7 @@ void R_RegisterEngineStuff(void)
 	CV_RegisterVar(&cv_chasecam2);
 	CV_RegisterVar(&cv_shadow);
 	CV_RegisterVar(&cv_shadowoffs);
+	CV_RegisterVar(&cv_shadowposition);
 	CV_RegisterVar(&cv_skybox);
 
 	CV_RegisterVar(&cv_cam_dist);
