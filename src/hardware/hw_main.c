@@ -89,6 +89,7 @@ static void CV_filtermode_ONChange(void);
 static void CV_anisotropic_ONChange(void);
 static void CV_FogDensity_ONChange(void);
 static void CV_grFov_OnChange(void);
+static void CV_Gammaxxx_ONChange(void);
 // ==========================================================================
 //                                          3D ENGINE COMMANDS & CONSOLE VARS
 // ==========================================================================
@@ -100,9 +101,33 @@ static CV_PossibleValue_t grfiltermode_cons_t[]= {{HWD_SET_TEXTUREFILTER_POINTSA
 	{HWD_SET_TEXTUREFILTER_MIXED2, "Nearest_Linear"},
 	{HWD_SET_TEXTUREFILTER_MIXED3, "Nearest_Mipmap"},
 	{0, NULL}};
+
 CV_PossibleValue_t granisotropicmode_cons_t[] = {{1, "MIN"}, {16, "MAX"}, {0, NULL}};
 
 CV_PossibleValue_t glloadingscreen_cons_t[] = {{0, "OFF"}, {1, "2.1.0-2.1.4"}, {2, "Pre 2.1"},  {0, NULL}};
+
+static CV_PossibleValue_t grgamma_cons_t[] = {{1, "MIN"}, {255, "MAX"}, {0, NULL}};
+static CV_PossibleValue_t grmodelinterpolation_cons_t[] = {{0, "Off"}, {1, "Sometimes"}, {2, "Always"}, {0, NULL}};
+static CV_PossibleValue_t grsoftwarefog_cons_t[] = {{0, "Off"}, {1, "On"}, {2, "LightPlanes"}, {0, NULL}};
+
+consvar_t cv_grfovchange = {"gr_fovchange", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grfog = {"gr_fog", "On", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grfogcolor = {"gr_fogcolor", "AAAAAA", CV_SAVE, NULL, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grsoftwarefog = {"gr_softwarefog", "Off", CV_SAVE, grsoftwarefog_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grgammared = {"gr_gammared", "127", CV_SAVE|CV_CALL, grgamma_cons_t,
+                           CV_Gammaxxx_ONChange, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grgammagreen = {"gr_gammagreen", "127", CV_SAVE|CV_CALL, grgamma_cons_t,
+                             CV_Gammaxxx_ONChange, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grgammablue = {"gr_gammablue", "127", CV_SAVE|CV_CALL, grgamma_cons_t,
+                            CV_Gammaxxx_ONChange, 0, NULL, NULL, 0, 0, NULL};
+
+#ifdef ALAM_LIGHTING
+consvar_t cv_grdynamiclighting = {"gr_dynamiclighting", "On", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grstaticlighting  = {"gr_staticlighting", "On", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grcoronas = {"gr_coronas", "On", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grcoronasize = {"gr_coronasize", "1", CV_SAVE| CV_FLOAT, 0, NULL, 0, NULL, NULL, 0, 0, NULL};
+#endif
+
 
 boolean drawsky = true;
 
@@ -133,26 +158,42 @@ consvar_t cv_grmodellighting = {"gr_modellighting", "Off", CV_SAVE|CV_CALL, CV_O
 
 consvar_t cv_glloadingscreen = {"glloadingscreen", "Off", CV_SAVE, glloadingscreen_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 
+consvar_t cv_grmd2 = {"gr_md2", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grmodelinterpolation = {"gr_modelinterpolation", "Sometimes", CV_SAVE, grmodelinterpolation_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grspritebillboarding = {"gr_spritebillboarding", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grskydome = {"gr_skydome", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL}; //now off by default
+
 static void CV_FogDensity_ONChange(void)
 {
+  if (rendermode == render_opengl)
 	HWD.pfnSetSpecialState(HWD_SET_FOG_DENSITY, cv_grfogdensity.value);
 }
 
 static void CV_filtermode_ONChange(void)
 {
+  if (rendermode == render_opengl)
 	HWD.pfnSetSpecialState(HWD_SET_TEXTUREFILTERMODE, cv_grfiltermode.value);
 }
 
 static void CV_anisotropic_ONChange(void)
 {
+  if (rendermode == render_opengl)
 	HWD.pfnSetSpecialState(HWD_SET_TEXTUREANISOTROPICMODE, cv_granisotropicmode.value);
 }
 
 static void CV_grmodellighting_OnChange(void)
 {
-	if (rendermode == render_opengl)
+  if (rendermode == render_opengl)
 		HWD.pfnSetSpecialState(HWD_SET_MODEL_LIGHTING, cv_grmodellighting.value);
 }
+
+// change the palette directly to see the change
+static void CV_Gammaxxx_ONChange(void)
+{
+	if (rendermode == render_opengl)
+		V_SetPalette(0);
+}
+
 
 /*
  * lookuptable for lightvalues
@@ -6182,10 +6223,6 @@ static void HWR_FoggingOn(void)
 	HWD.pfnSetSpecialState(HWD_SET_FOG_MODE, 1);
 }
 
-// ==========================================================================
-//                                                         3D ENGINE COMMANDS
-// ==========================================================================
-
 
 static void CV_grFov_OnChange(void)
 {
@@ -6203,9 +6240,6 @@ static void Command_GrStats_f(void)
 }
 
 
-// **************************************************************************
-//                                                            3D ENGINE SETUP
-// **************************************************************************
 
 // --------------------------------------------------------------------------
 // Add hardware engine commands & consvars
@@ -6222,6 +6256,23 @@ void HWR_AddCommands(void)
 	CV_RegisterVar(&cv_grsolvetjoin);
 	CV_RegisterVar(&cv_grmodellighting);
 	CV_RegisterVar(&cv_glloadingscreen);
+	CV_RegisterVar(&cv_grgammablue);
+	CV_RegisterVar(&cv_grgammagreen);
+	CV_RegisterVar(&cv_grgammared);
+	CV_RegisterVar(&cv_grfovchange);
+	CV_RegisterVar(&cv_grfog);
+	CV_RegisterVar(&cv_grfogcolor);
+	CV_RegisterVar(&cv_grsoftwarefog);
+#ifdef ALAM_LIGHTING
+	CV_RegisterVar(&cv_grstaticlighting);
+	CV_RegisterVar(&cv_grdynamiclighting);
+	CV_RegisterVar(&cv_grcoronas);
+	CV_RegisterVar(&cv_grcoronasize);
+#endif
+	CV_RegisterVar(&cv_grmd2);
+	CV_RegisterVar(&cv_grmodelinterpolation);
+	CV_RegisterVar(&cv_grspritebillboarding);
+	CV_RegisterVar(&cv_grskydome);
 }
 
 static inline void HWR_AddEngineCommands(void)
