@@ -52,6 +52,7 @@ void (*twosmultipatchtransfunc)(void); // for cols with transparent pixels AND t
 // ------------------
 viddef_t vid;
 INT32 setmodeneeded; //video mode change needed if > 0 (the mode number to set + 1)
+INT32 setresneeded[3]; // if setresneeded[2] is > 0, set resolution
 
 static CV_PossibleValue_t scr_depth_cons_t[] = {{8, "8 bits"}, {16, "16 bits"}, {24, "24 bits"}, {32, "32 bits"}, {0, NULL}};
 
@@ -83,6 +84,24 @@ UINT8 *scr_borderpatch; // flat used to fill the reduced view borders set at ST_
 //  Short and Tall sky drawer, for the current color mode
 void (*walldrawerfunc)(void);
 
+//
+// setup the right draw routines for 8bpp
+//
+static void SetupDrawRoutines(void)
+{
+		spanfunc = basespanfunc = R_DrawSpan_8;
+		splatfunc = R_DrawSplat_8;
+		transcolfunc = R_DrawTranslatedColumn_8;
+		transtransfunc = R_DrawTranslatedTranslucentColumn_8;
+
+		colfunc = basecolfunc = R_DrawColumn_8;
+		shadecolfunc = R_DrawShadeColumn_8;
+		fuzzcolfunc = R_DrawTranslucentColumn_8;
+		walldrawerfunc = R_DrawWallColumn_8;
+		twosmultipatchfunc = R_Draw2sMultiPatchColumn_8;
+		twosmultipatchtransfunc = R_Draw2sMultiPatchTranslucentColumn_8;
+}
+
 void SCR_SetMode(void)
 {
 	if (dedicated)
@@ -95,42 +114,8 @@ void SCR_SetMode(void)
 
 	V_SetPalette(0);
 
-	//
-	//  setup the right draw routines for either 8bpp or 16bpp
-	//
-	if (true)//vid.bpp == 1) //Always run in 8bpp. todo: remove all 16bpp code?
-	{
-		spanfunc = basespanfunc = R_DrawSpan_8;
-		splatfunc = R_DrawSplat_8;
-		transcolfunc = R_DrawTranslatedColumn_8;
-		transtransfunc = R_DrawTranslatedTranslucentColumn_8;
-
-		colfunc = basecolfunc = R_DrawColumn_8;
-		shadecolfunc = R_DrawShadeColumn_8;
-		fuzzcolfunc = R_DrawTranslucentColumn_8;
-		walldrawerfunc = R_DrawWallColumn_8;
-		twosmultipatchfunc = R_Draw2sMultiPatchColumn_8;
-		twosmultipatchtransfunc = R_Draw2sMultiPatchTranslucentColumn_8;
-	}
-/*	else if (vid.bpp > 1)
-	{
-		I_OutputMsg("using highcolor mode\n");
-		spanfunc = basespanfunc = R_DrawSpan_16;
-		transcolfunc = R_DrawTranslatedColumn_16;
-		transtransfunc = R_DrawTranslucentColumn_16; // No 16bit operation for this function
-
-		colfunc = basecolfunc = R_DrawColumn_16;
-		shadecolfunc = NULL; // detect error if used somewhere..
-		fuzzcolfunc = R_DrawTranslucentColumn_16;
-		walldrawerfunc = R_DrawWallColumn_16;
-	}*/
-	else
-		I_Error("unknown bytes per pixel mode %d\n", vid.bpp);
-/*#if !defined (DC) && !defined (WII)
-	if (SCR_IsAspectCorrect(vid.width, vid.height))
-		CONS_Alert(CONS_WARNING, M_GetText("Resolution is not aspect-correct!\nUse a multiple of %dx%d\n"), BASEVIDWIDTH, BASEVIDHEIGHT);
-#endif*/
-	// set the apprpriate drawer for the sky (tall or INT16)
+	// set the apprpriate drawers
+	SetupDrawRoutines();
 	setmodeneeded = 0;
 }
 
