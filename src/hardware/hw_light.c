@@ -1045,7 +1045,7 @@ void HWR_DL_AddLight(gr_vissprite_t *spr, GLPatch_t *patch)
 	// uncapped/interpolation
 	interpmobjstate_t interp = {0};
 
-	if (cv_frameinterpolation.value == 1)
+	if (R_UsingFrameInterpolation())
 	{
 		R_InterpolateMobjState(spr->mobj, rendertimefrac, &interp);
 	}

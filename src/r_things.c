@@ -742,7 +742,7 @@ static void R_DrawVisSprite(vissprite_t *vis)
 #endif
 	fixed_t frac;
 	patch_t *patch = W_CacheLumpNum(vis->patch, PU_CACHE);
-	fixed_t this_scale = vis->mobj->scale;
+	fixed_t this_scale = vis->thingscale;
 	INT32 x1, x2;
 	INT64 overflow_test;
 
@@ -1140,7 +1140,6 @@ fixed_t R_GetShadowZ(mobj_t *thing, pslope_t **shadowslope)
 //
 static void R_ProjectSprite(mobj_t *thing)
 {
-	mobj_t *oldthing = thing;
 	fixed_t tr_x, tr_y;
 	fixed_t gxt, gyt;
 	fixed_t tx, tz;
@@ -1166,14 +1165,13 @@ static void R_ProjectSprite(mobj_t *thing)
 	fixed_t gz, gzt;
 	INT32 heightsec, phs;
 	INT32 light = 0;
-	fixed_t this_scale = thing->scale; 
-
+	fixed_t this_scale;
 
     interpmobjstate_t interp = {0};
 	
 
 	// do interpolation
-	if (cv_frameinterpolation.value == 1)
+	if (R_UsingFrameInterpolation())
 	{
 		R_InterpolateMobjState(thing, rendertimefrac, &interp);
 	}
@@ -1183,6 +1181,7 @@ static void R_ProjectSprite(mobj_t *thing)
 	}
 
 
+	this_scale = interp.scale;
 
 	// transform the origin point
 	tr_x = interp.x - viewx;
@@ -1306,12 +1305,12 @@ static void R_ProjectSprite(mobj_t *thing)
 		// When vertical flipped, draw sprites from the top down, at least as far as offsets are concerned.
 		// sprite height - sprite topoffset is the proper inverse of the vertical offset, of course.
 		// remember gz and gzt should be seperated by sprite height, not thing height - thing height can be shorter than the sprite itself sometimes!
-		gz = interp.z + oldthing->height - FixedMul(spritecachedinfo[lump].topoffset, this_scale);
+		gz = interp.z + thing->height - FixedMul(spritecachedinfo[lump].topoffset, this_scale);
 		gzt = gz + FixedMul(spritecachedinfo[lump].height, this_scale);
 	}
 	else
 	{
-		gzt = interp.z + spritecachedinfo[lump].topoffset;
+		gzt = interp.z + FixedMul(spritecachedinfo[lump].topoffset, this_scale);
 		gz = gzt - FixedMul(spritecachedinfo[lump].height, this_scale);
 	}
 
@@ -1421,6 +1420,8 @@ static void R_ProjectSprite(mobj_t *thing)
 	if (vis->x1 > x1)
 		vis->startfrac += FixedDiv(vis->xiscale, this_scale)*(vis->x1-x1);
 
+
+	vis->thingscale = interp.scale;
 	//Fab: lumppat is the lump number of the patch to use, this is different
 	//     than lumpid for sprites-in-pwad : the graphics are patched
 	vis->patch = sprframe->lumppat[rot];
@@ -1494,7 +1495,7 @@ static void R_ProjectPrecipitationSprite(precipmobj_t *thing)
 	// uncapped/interpolation
     interpmobjstate_t interp = {0};
 	// do interpolation
-	if (cv_frameinterpolation.value == 1)
+	if (R_UsingFrameInterpolation())
 	{
 		R_InterpolatePrecipMobjState(thing, rendertimefrac, &interp);
 	}

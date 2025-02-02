@@ -4138,7 +4138,7 @@ static void HWR_DrawSpriteShadow(gr_vissprite_t *spr, GLPatch_t *gpatch, float t
     
     interpmobjstate_t interp = {0};
 
-	if (cv_frameinterpolation.value == 1)
+	if (R_UsingFrameInterpolation())
 	{
 	  R_InterpolateMobjState(spr->mobj, rendertimefrac, &interp);
 	}
@@ -4353,7 +4353,7 @@ static void HWR_RotateSpritePolyToAim(gr_vissprite_t *spr, FOutVector *wallVerts
 
 
 		// do interpolation
-	    if (cv_frameinterpolation.value == 1)
+	    if (R_UsingFrameInterpolation())
 	    {
 	      R_InterpolateMobjState(spr->mobj, rendertimefrac, &interp);
 	    }
@@ -5249,7 +5249,7 @@ static void HWR_ProjectSprite(mobj_t *thing)
 	else
      
 
-	if (cv_frameinterpolation.value == 1)
+	if (R_UsingFrameInterpolation())
 	{
       R_InterpolateMobjState(thing, rendertimefrac, &interp);
 	}
@@ -5260,7 +5260,7 @@ static void HWR_ProjectSprite(mobj_t *thing)
 
 
 
-		this_scale = FIXED_TO_FLOAT(thing->scale);
+	this_scale = FIXED_TO_FLOAT(interp.scale);
 
 	// transform the origin point
 	tr_x = FIXED_TO_FLOAT(interp.x) - gr_viewx;
@@ -5472,7 +5472,7 @@ static void HWR_ProjectPrecipitationSprite(precipmobj_t *thing)
     interpmobjstate_t interp = {0};
 
 	// do interpolation
-	if (cv_frameinterpolation.value == 1)
+	if (R_UsingFrameInterpolation())
 	{
 		R_InterpolatePrecipMobjState(thing, rendertimefrac, &interp);
 	}

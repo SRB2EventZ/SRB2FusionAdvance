@@ -352,6 +352,8 @@ typedef struct mobj_s
 	UINT32 mobjnum; // A unique number for this mobj. Used for restoring pointers on save games.
 
 	fixed_t scale;
+	fixed_t old_scale; // interpolation
+	fixed_t old_scale2;
 	fixed_t destscale;
 	fixed_t scalespeed;
 
@@ -367,6 +369,8 @@ typedef struct mobj_s
 #ifdef ESLOPE
 	struct pslope_s *standingslope; // The slope that the object is standing on (shouldn't need synced in savegames, right?)
 #endif
+
+	boolean resetinterp; // if true, some fields should not be interpolated (see R_InterpolateMobjState implementation)
 
 	// WARNING: New fields must be added separately to savegame and Lua.
 } mobj_t;

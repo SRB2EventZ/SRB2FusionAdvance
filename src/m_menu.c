@@ -26,6 +26,7 @@
 #include "hu_stuff.h"
 #include "g_game.h"
 #include "g_input.h"
+#include "i_time.h"
 #include "m_argv.h"
 
 // Data.
@@ -1159,7 +1160,7 @@ static menuitem_t OP_VideoOptionsMenu[] =
 	{IT_STRING | IT_CVAR,    NULL, "Clear Before Redraw", &cv_homremoval, 110},
 
 	{IT_STRING | IT_CVAR,    NULL, "Vertical Sync",       &cv_vidwait,    125},
-	{IT_STRING | IT_CVAR,    NULL, "Frame Interpolation",       &cv_frameinterpolation, 135},
+	{IT_STRING | IT_CVAR,    NULL, "FPS Cap",       &cv_fpscap, 135},
 
 	#ifdef HWRENDER
 	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    150},
@@ -8336,7 +8337,9 @@ void M_QuitResponse(INT32 ch)
 		{
 			V_DrawScaledPatch(0, 0, 0, W_CachePatchName("GAMEQUIT", PU_CACHE)); // Demo 3 Quit Screen Tails 06-16-2001
 			I_FinishUpdate(); // Update the screen with the image Tails 06-19-2001
-			I_Sleep();
+			I_Sleep(cv_sleep.value);
+			I_UpdateTime(cv_timescale.value);
+
 		}
 	}
 	I_Quit();
