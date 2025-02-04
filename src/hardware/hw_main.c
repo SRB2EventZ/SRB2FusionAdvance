@@ -4193,6 +4193,7 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 			baseWallVerts[i].y += (gr_viewz - baseWallVerts[i].y)*distfact;
 		}
 	}
+	
 	realtop = top = baseWallVerts[3].y;
 	realbot = bot = baseWallVerts[0].y;
 	ttop = baseWallVerts[3].t;
