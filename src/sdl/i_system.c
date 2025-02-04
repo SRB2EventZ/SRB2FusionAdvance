@@ -1510,17 +1510,7 @@ const char *I_GetJoyName(INT32 joyindex)
 	const char *tempname = NULL;
 	joyname[0] = 0;
 	joyindex--; //SDL's Joystick System starts at 0, not 1
-	if (SDL_WasInit(SDL_INIT_JOYSTICK) == 0)
-	{
-		if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != -1)
-		{
-			tempname = SDL_JoystickNameForIndex(joyindex);
-			if (tempname)
-				strncpy(joyname, tempname, sizeof(joyname)-1);
-		}
-		SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-	}
-	else
+	if (SDL_WasInit(SDL_INIT_JOYSTICK) == SDL_INIT_JOYSTICK)
 	{
 		tempname = SDL_JoystickNameForIndex(joyindex);
 		if (tempname)

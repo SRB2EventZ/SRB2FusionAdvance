@@ -1041,6 +1041,19 @@ void HWR_DL_AddLight(gr_vissprite_t *spr, GLPatch_t *patch)
 {
 	light_t   *p_lspr;
 
+
+	// uncapped/interpolation
+	interpmobjstate_t interp = {0};
+
+	if (cv_frameinterpolation.value == 1)
+	{
+		R_InterpolateMobjState(spr->mobj, rendertimefrac, &interp);
+	}
+	else
+	{
+		R_InterpolateMobjState(spr->mobj, FRACUNIT, &interp);
+	}
+
 	//Hurdler: moved here because it's better;-)
 	(void)patch;
 	if (!cv_grdynamiclighting.value)
@@ -1061,9 +1074,9 @@ void HWR_DL_AddLight(gr_vissprite_t *spr, GLPatch_t *patch)
 
 	  && spr->mobj->state)
 	{
-		LIGHT_POS(dynlights->nb).x = FIXED_TO_FLOAT(spr->mobj->x);
-		LIGHT_POS(dynlights->nb).y = FIXED_TO_FLOAT(spr->mobj->z)+FIXED_TO_FLOAT(spr->mobj->height>>1)+p_lspr->light_yoffset;
-		LIGHT_POS(dynlights->nb).z = FIXED_TO_FLOAT(spr->mobj->y);
+		LIGHT_POS(dynlights->nb).x = FIXED_TO_FLOAT(interp.x);
+		LIGHT_POS(dynlights->nb).y = FIXED_TO_FLOAT(interp.z)+FIXED_TO_FLOAT(spr->mobj->height>>1)+p_lspr->light_yoffset;
+		LIGHT_POS(dynlights->nb).z = FIXED_TO_FLOAT(interp.y);
 
 		P_SetTarget(&dynlights->mo[dynlights->nb], spr->mobj);
 

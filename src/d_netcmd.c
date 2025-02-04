@@ -709,6 +709,7 @@ void D_RegisterClientCommands(void)
 	CV_RegisterVar(&cv_alwaysfreelook2);
 	CV_RegisterVar(&cv_chasefreelook);
 	CV_RegisterVar(&cv_chasefreelook2);
+	CV_RegisterVar(&cv_textboxstyle);
 
 	// g_input.c
 	CV_RegisterVar(&cv_sideaxis);

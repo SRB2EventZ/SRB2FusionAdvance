@@ -234,7 +234,6 @@ static menu_t SP_NightsAttackDef, SP_NightsReplayDef, SP_NightsGuestReplayDef, S
 #ifndef NONET
 static void M_StartServerMenu(INT32 choice);
 static void M_ConnectMenu(INT32 choice);
-static void M_ConnectIPMenu(INT32 choice);
 #endif
 static void M_StartSplitServerMenu(INT32 choice);
 static void M_StartServer(INT32 choice);
@@ -310,7 +309,7 @@ static void M_OGL_DrawColorMenu(void);
 #endif
 #ifndef NONET
 static void M_DrawConnectMenu(void);
-static void M_DrawConnectIPMenu(void);
+static void M_DrawMPMainMenu(void);
 static void M_DrawRoomMenu(void);
 #endif
 static void M_DrawJoystick(void);
@@ -342,6 +341,9 @@ static void Nextmap_OnChange(void);
 static void Newgametype_OnChange(void);
 static void Dummymares_OnChange(void);
 static void Textbox_OnChange(void);
+
+// IP Validity function
+static boolean M_CheckIfValidIPv4(const char *str);
 
 // ==========================================================================
 // CONSOLE VARIABLES AND THEIR POSSIBLE VALUES GO HERE.
@@ -404,7 +406,7 @@ static consvar_t cv_dummycontinues = {"dummycontinues", "0", CV_HIDEN, liveslimi
 static consvar_t cv_dummymares = {"dummymares", "Overall", CV_HIDEN|CV_CALL, dummymares_cons_t, Dummymares_OnChange, 0, NULL, NULL, 0, 0, NULL};
 
 static CV_PossibleValue_t textbox_cons_t[] = {{0, "Solid"}, {1, "GFZROCK"}, {0, NULL}};
-static consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
 // ==========================================================================
 // ORGANIZATION START.
 // ==========================================================================
@@ -818,12 +820,12 @@ static menuitem_t MP_MainMenu[] =
 #ifndef NONET
 	{IT_CALL | IT_STRING, NULL, "HOST GAME",              M_StartServerMenu,      10},
 	{IT_CALL | IT_STRING, NULL, "JOIN GAME (Search)",	  M_ConnectMenu,		  30},
-	{IT_CALL | IT_STRING, NULL, "JOIN GAME (Specify IP)", M_ConnectIPMenu,        40},
+	{IT_KEYHANDLER | IT_STRING, NULL, "JOIN GAME (Specify IP)", M_HandleConnectIP,        40},
 #endif
-	{IT_CALL | IT_STRING, NULL, "TWO PLAYER GAME",        M_StartSplitServerMenu, 60},
+	{IT_CALL | IT_STRING, NULL, "TWO PLAYER GAME",        M_StartSplitServerMenu, 80},
 
-	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 1",         M_SetupMultiPlayer,     80},
-	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 2",         M_SetupMultiPlayer2,    90},
+	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 1",         M_SetupMultiPlayer,     100},
+	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 2",         M_SetupMultiPlayer2,    110},
 };
 
 static menuitem_t MP_ServerMenu[] =
@@ -900,11 +902,6 @@ static menuitem_t MP_RoomMenu[] =
 	{IT_DISABLED,         NULL, "",               M_ChooseRoom, 144},
 	{IT_DISABLED,         NULL, "",               M_ChooseRoom, 153},
 	{IT_DISABLED,         NULL, "",               M_ChooseRoom, 162},
-};
-
-static menuitem_t MP_ConnectIPMenu[] =
-{
-	{IT_KEYHANDLER | IT_STRING, NULL, "  IP Address:", M_HandleConnectIP, 0},
 };
 #endif
 
@@ -1144,26 +1141,29 @@ static menuitem_t OP_VideoOptionsMenu[] =
 {
 	{IT_STRING | IT_CALL,  NULL,   "Video Modes...",      M_VideoModeMenu,     10},
 
-#ifdef HWRENDER
-	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    20},
-#endif
+
 
 #if (defined (__unix__) && !defined (MSDOS)) || defined (UNIXCOMMON) || defined (HAVE_SDL)
-	{IT_STRING|IT_CVAR,      NULL, "Fullscreen",          &cv_fullscreen,    30},
+	{IT_STRING|IT_CVAR,      NULL, "Fullscreen",          &cv_fullscreen,    20},
 #endif
 
 	{IT_STRING | IT_CVAR | IT_CV_SLIDER,
-	                         NULL, "Brightness",          &cv_usegamma,      50},
-	{IT_STRING | IT_CVAR,    NULL, "Draw Distance",       &cv_drawdist, 60},
-	{IT_STRING | IT_CVAR,    NULL, "NiGHTS Draw Dist",    &cv_drawdist_nights, 70},
-	{IT_STRING | IT_CVAR,    NULL, "Precip Draw Dist",    &cv_drawdist_precip, 80},
-	{IT_STRING | IT_CVAR,    NULL, "Precip Density",      &cv_precipdensity, 90},
+	                         NULL, "Brightness",          &cv_usegamma,      35},
+	{IT_STRING | IT_CVAR,    NULL, "Draw Distance",       &cv_drawdist, 45},
+	{IT_STRING | IT_CVAR,    NULL, "NiGHTS Draw Dist",    &cv_drawdist_nights, 55},
+	{IT_STRING | IT_CVAR,    NULL, "Precip Draw Dist",    &cv_drawdist_precip, 65},
+	{IT_STRING | IT_CVAR,    NULL, "Precip Density",      &cv_precipdensity, 75},
 
-	{IT_STRING | IT_CVAR,    NULL, "Show FPS",            &cv_ticrate,    110},
-	{IT_STRING | IT_CVAR,    NULL, "Show TPS",            &cv_tpscounter,    120},
-	{IT_STRING | IT_CVAR,    NULL, "Clear Before Redraw", &cv_homremoval, 130},
-	{IT_STRING | IT_CVAR,    NULL, "Vertical Sync",       &cv_vidwait,    140},
-	{IT_STRING | IT_CVAR,    NULL, "Frame Interpolation",       &cv_frameinterpolation, 150},
+	{IT_STRING | IT_CVAR,    NULL, "Show FPS",            &cv_ticrate,    90},
+	{IT_STRING | IT_CVAR,    NULL, "Show TPS",            &cv_tpscounter,    100},
+	{IT_STRING | IT_CVAR,    NULL, "Clear Before Redraw", &cv_homremoval, 110},
+
+	{IT_STRING | IT_CVAR,    NULL, "Vertical Sync",       &cv_vidwait,    125},
+	{IT_STRING | IT_CVAR,    NULL, "Frame Interpolation",       &cv_frameinterpolation, 135},
+
+	#ifdef HWRENDER
+	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    150},
+	#endif
 };
 
 static menuitem_t OP_VideoModeMenu[] =
@@ -1175,22 +1175,20 @@ static menuitem_t OP_VideoModeMenu[] =
 static menuitem_t OP_OpenGLOptionsMenu[] =
 {
 	{IT_STRING|IT_CVAR,         NULL, "3D Models",    &cv_grmd2,      10},
-	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_grmodellighting,      20},
-	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_grfov,            30},
-	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        40},
-	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     50},
-	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,60},
-	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      70},
-	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      80},
-#ifdef _WINDOWS
-	{IT_STRING|IT_CVAR,         NULL, "Fullscreen",      &cv_fullscreen,       90},
-#endif
+	{IT_STRING|IT_CVAR,         NULL, "Model Interpolation",    &cv_grmodelinterpolation,      20},
+	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_grmodellighting,      30},
+	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_grfov,            50},
+	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        60},
+	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     70},
+	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,80},
+	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      100},
+	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      110},
 
 #ifdef ALAM_LIGHTING
-	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     100},
+	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     130},
 #endif
-	{IT_SUBMENU|IT_STRING,      NULL, "Fog...",          &OP_OpenGLFogDef,          110},
-	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        120},
+	{IT_SUBMENU|IT_STRING,      NULL, "Fog...",          &OP_OpenGLFogDef,          140},
+	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        150},
 };
 
 #ifdef ALAM_LIGHTING
@@ -1681,7 +1679,17 @@ menu_t SP_PlayerDef =
 };
 
 // Multiplayer
-menu_t MP_MainDef = DEFAULTMENUSTYLE("M_MULTI", MP_MainMenu, &MainDef, 60, 40);
+menu_t MP_MainDef =
+{
+	"M_MULTI",
+	sizeof (MP_MainMenu)/sizeof (menuitem_t),
+	&MainDef,
+	MP_MainMenu,
+	M_DrawMPMainMenu,
+	60, 45,
+	0,
+	M_CancelConnect
+};
 menu_t MP_ServerDef = MAPICONMENUSTYLE("M_MULTI", MP_ServerMenu, &MP_MainDef);
 #ifndef NONET
 menu_t MP_ConnectDef =
@@ -1692,17 +1700,6 @@ menu_t MP_ConnectDef =
 	MP_ConnectMenu,
 	M_DrawConnectMenu,
 	27,24,
-	0,
-	M_CancelConnect
-};
-menu_t MP_ConnectIPDef =
-{
-	"M_MULTI",
-	sizeof (MP_ConnectIPMenu)/sizeof (menuitem_t),
-	&MP_MainDef,
-	MP_ConnectIPMenu,
-	M_DrawConnectIPMenu,
-	27,40,
 	0,
 	M_CancelConnect
 };
@@ -2894,7 +2891,7 @@ void M_Init(void)
 #ifdef HWRENDER
 	// Permanently hide some options based on render mode
 	if (rendermode == render_soft)
-		OP_VideoOptionsMenu[1].status = IT_DISABLED;
+		OP_VideoOptionsMenu[12].status = IT_DISABLED;
 #endif
 
 #ifndef NONET
@@ -7042,32 +7039,42 @@ static void M_StartServerMenu(INT32 choice)
 // CONNECT VIA IP
 // ==============
 
-static char setupm_ip[16];
-
-// Connect using IP address Tails 11-19-2002
-static void M_ConnectIPMenu(INT32 choice)
-{
-	(void)choice;
-	// modified game check: no longer handled
-	// we don't request a restart unless the filelist differs
-
-	M_SetupNextMenu(&MP_ConnectIPDef);
-}
+static char setupm_ip[128];
 
 // Draw the funky Connect IP menu. Tails 11-19-2002
 // So much work for such a little thing!
-static void M_DrawConnectIPMenu(void)
+static void M_DrawMPMainMenu(void)
 {
 	// use generic drawer for cursor, items and title
 	M_DrawGenericMenu();
 
 	// draw name string
-	V_DrawString(128,40, V_MONOSPACE, setupm_ip);
+	M_DrawTextBox(55,90,22,1);
 
-	// draw text cursor for name
-	if (itemOn == 0 &&
-	    skullAnimCounter < 4)   //blink cursor
-		V_DrawCharacter(128+V_StringWidth(setupm_ip, V_MONOSPACE),40,'_',false);
+	if ( strlen(setupm_ip) > 21 ) { // Is setupm_ip larger than the textbox can fit?
+
+		char left_arrow[1+1] = "\x1C"; // Left arrow
+
+		char new_setupm_ip[21]; // Last 21 characters of setupm_ip
+		strcat(new_setupm_ip, setupm_ip+(strlen(setupm_ip)-21));
+
+		if (itemOn == 2)
+			V_DrawThinString(53 + (skullAnimCounter % 8) / 4,98, V_ALLOWLOWERCASE|V_MONOSPACE|V_YELLOWMAP, left_arrow); // Draw the left arrow
+
+		V_DrawString(65,98, V_ALLOWLOWERCASE|V_MONOSPACE, new_setupm_ip); // Draw the truncated setupm_ip.
+	 
+	 	// draw text cursor for name
+		if (itemOn == 2 &&
+		    skullAnimCounter < 4)   //blink cursor
+			V_DrawCharacter(65+V_StringWidth(new_setupm_ip, V_ALLOWLOWERCASE|V_MONOSPACE),98,'_',false);
+	} else {
+		V_DrawString(65,98, V_ALLOWLOWERCASE|V_MONOSPACE, setupm_ip);
+
+		// draw text cursor for name
+		if (itemOn == 2 &&
+		    skullAnimCounter < 4)   //blink cursor
+			V_DrawCharacter(65+V_StringWidth(setupm_ip, V_ALLOWLOWERCASE|V_MONOSPACE),98,'_',false);
+	}
 }
 
 // Tails 11-19-2002
@@ -7075,12 +7082,37 @@ static void M_ConnectIP(INT32 choice)
 {
 	(void)choice;
 
-	if (*setupm_ip == 0)
+	M_ClearMenus(true);
+
+	if (*setupm_ip == 0) // Length 0
 	{
 		M_StartMessage("You must specify an IP address.\n", NULL, MM_NOTHING);
 		return;
 	}
 
+	if (!M_CheckIfValidIPv4(setupm_ip) && strstr(setupm_ip, ":") == NULL) // Not IPv4 and no colons
+	{
+		int i = 0;
+		while (setupm_ip[i]) // For each char in setupm_ip
+		{
+			// Is it an alphabet letter or brackets?
+			if (isalpha(setupm_ip[i]) || setupm_ip[i] == 91 || setupm_ip[i] == 93) {
+				break; // It's probably valid
+			} else { // Otherwise
+				// It's invalid
+				M_StartMessage("You must specify a valid IP address.\n", NULL, MM_NOTHING);
+				return;
+			}
+			i++;
+		}
+	}
+
+	if (setupm_ip[(strlen(setupm_ip)-1)] == 58) { // If there is a colon at the end of the char
+		M_StartMessage("Please specify a valid port.\n", NULL, MM_NOTHING);
+		return;
+	}
+
+	// Checks passed, attempt connection!
 	COM_BufAddText(va("connect \"%s\"\n", setupm_ip));
 
 	// A little "please wait" message.
@@ -7092,17 +7124,70 @@ static void M_ConnectIP(INT32 choice)
 		I_FinishUpdate(); // page flip or blit buffer
 }
 
+static boolean M_CheckIfValidIPv4(const char *str)
+{
+    int segs = 0;   // Segment count.
+    int chcnt = 0;  // Character count within segment.
+    int accum = 0;  // Accumulator for segment.
+    // Catch NULL pointer.
+    if (str == NULL)
+        return false;
+    // Process every character in string.
+    while (*str != '\0') {
+        // Segment changeover.
+        if (*str == '.') {
+            // Must have some digits in segment.
+            if (chcnt == 0)
+                return false;
+            // Limit number of segments.
+            if (++segs == 4)
+                return false;
+            // Reset segment values and restart loop.
+            chcnt = accum = 0;
+            str++;
+            continue;
+        }
+        // Check numeric.
+        if ((*str < '0') || (*str > '9'))
+            return false;
+        // Accumulate and check segment.
+        if ((accum = accum * 10 + *str - '0') > 255)
+            return false;
+        // Advance other segment specific stuff and continue loop.
+        chcnt++;
+        str++;
+    }
+    // Check enough segments and enough characters in last segment.
+    if (segs != 3)
+        return false;
+    if (chcnt == 0)
+        return false;
+    // Address okay.
+    return true;
+}
+
 // Tails 11-19-2002
+
 static void M_HandleConnectIP(INT32 choice)
 {
-	size_t   l;
-	boolean  exitmenu = false;  // exit to previous menu and send name change
+	size_t l;
+	boolean exitmenu = false;  // exit to previous menu and send name change
 
 	switch (choice)
 	{
+		case KEY_DOWNARROW:
+			M_NextOpt();
+			S_StartSound(NULL,sfx_menu1); // Tails
+			break;
+
+		case KEY_UPARROW:
+			M_PrevOpt();
+			S_StartSound(NULL,sfx_menu1); // Tails
+			break;
+
 		case KEY_ENTER:
 			S_StartSound(NULL,sfx_menu1); // Tails
-			M_ClearMenus(true);
+			currentMenu->lastOn = itemOn;
 			M_ConnectIP(1);
 			break;
 
@@ -7111,29 +7196,68 @@ static void M_HandleConnectIP(INT32 choice)
 			break;
 
 		case KEY_BACKSPACE:
-			if ((l = strlen(setupm_ip))!=0 && itemOn == 0)
+			skullAnimCounter = 4; // For a nice looking cursor
+			if ((l = strlen(setupm_ip)) != 0)
 			{
-				S_StartSound(NULL,sfx_menu1); // Tails
-				setupm_ip[l-1] =0;
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[l-1] = 0;
+			}
+			break;
+
+		case KEY_DEL:
+			skullAnimCounter = 4; // For a nice looking cursor
+			if (setupm_ip[0])
+			{
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[0] = 0;
 			}
 			break;
 
 		default:
+			skullAnimCounter = 4; // For a nice looking cursor
+
 			l = strlen(setupm_ip);
-			if (l < 16-1 && (choice == 46 || (choice >= 48 && choice <= 57))) // Rudimentary number and period enforcing
-			{
-				S_StartSound(NULL,sfx_menu1); // Tails
-				setupm_ip[l] =(char)choice;
-				setupm_ip[l+1] =0;
+			if (l >= 127)
+				break;
+
+			const char *paste = I_ClipboardPaste(); // Paste clipboard into char
+
+			if ( ctrldown ) {
+				switch (choice) {
+					case 118: // ctrl+v, pasting
+						if (paste != NULL)
+							strcat(setupm_ip, paste); // Concat the ip field with clipboard
+						setupm_ip[127] = 0; // Truncate to maximum length
+						break;
+					case 99: // ctrl+c, copying
+						I_ClipboardCopy(setupm_ip, l);
+						break;
+					case 120: // ctrl+x, cutting
+						I_ClipboardCopy(setupm_ip, l);
+						setupm_ip[0] = 0;
+						break;
+					default: // otherwise do nothing
+						break;
+				}
+				break; // break
 			}
-			else if (l < 16-1 && choice >= 199 && choice <= 211 && choice != 202 && choice != 206) //numpad too!
+			
+			// Rudimentary number, letter, period, and colon enforcing
+			if (choice == 46 || choice == 91 || choice == 93 || (choice >= 65 && choice <= 90 ) || (choice >= 97 && choice <= 122 ) || (choice >= 48 && choice <= 58))
 			{
-				XBOXSTATIC char keypad_translation[] = {'7','8','9','-','4','5','6','+','1','2','3','0','.'};
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[l] = (char)choice;
+				setupm_ip[l+1] = 0;
+			}
+			else if (choice >= 199 && choice <= 211 && choice != 202 && choice != 206) //numpad too!
+			{
+				char keypad_translation[] = {'7','8','9','-','4','5','6','+','1','2','3','0','.'};
 				choice = keypad_translation[choice - 199];
-				S_StartSound(NULL,sfx_menu1); // Tails
-				setupm_ip[l] =(char)choice;
-				setupm_ip[l+1] =0;
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[l] = (char)choice;
+				setupm_ip[l+1] = 0;
 			}
+
 			break;
 	}
 

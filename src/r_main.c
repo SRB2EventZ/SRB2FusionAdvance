@@ -72,6 +72,8 @@ boolean viewsky, skyVisible;
 boolean skyVisible1, skyVisible2; // saved values of skyVisible for P1 and P2, for splitscreen
 sector_t *viewsector;
 player_t *viewplayer;
+mobj_t *r_viewmobj;
+
 
 fixed_t rendertimefrac;
 fixed_t renderdeltatics;
@@ -141,6 +143,7 @@ static CV_PossibleValue_t precipdensity_cons_t[] = {{0, "None"}, {1, "Light"}, {
 static CV_PossibleValue_t translucenthud_cons_t[] = {{0, "MIN"}, {10, "MAX"}, {0, NULL}};
 static CV_PossibleValue_t maxportals_cons_t[] = {{0, "MIN"}, {12, "MAX"}, {0, NULL}}; // lmao rendering 32 portals, you're a card
 static CV_PossibleValue_t homremoval_cons_t[] = {{0, "No"}, {1, "Yes"}, {2, "Flash"}, {0, NULL}};
+static CV_PossibleValue_t shadowposition_cons_t[] = {{0, "Static"}, {1, "Camera"}, {0, NULL}};
 
 static void ChaseCam_OnChange(void);
 static void ChaseCam2_OnChange(void);
@@ -156,6 +159,7 @@ consvar_t cv_flipcam = {"flipcam", "No", CV_SAVE|CV_CALL|CV_NOINIT, CV_YesNo, Fl
 consvar_t cv_flipcam2 = {"flipcam2", "No", CV_SAVE|CV_CALL|CV_NOINIT, CV_YesNo, FlipCam2_OnChange, 0, NULL, NULL, 0, 0, NULL};
 
 consvar_t cv_shadow = {"shadow", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_shadowposition = {"shadowposition", "Static", CV_SAVE, shadowposition_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_shadowoffs = {"offsetshadows", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_skybox = {"skybox", "On", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_soniccd = {"soniccd", "Off", CV_NETVAR, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
@@ -245,31 +249,6 @@ static void FlipCam2_OnChange(void)
 	SendWeaponPref2();
 }
 
-//
-// R_PointOnSide
-// Traverse BSP (sub) tree,
-// check point against partition plane.
-// Returns side 0 (front) or 1 (back).
-//
-// killough 5/2/98: reformatted
-//
-INT32 R_PointOnSide(fixed_t x, fixed_t y, node_t *restrict node)
-{
-	if (!node->dx)
-		return x <= node->x ? node->dy > 0 : node->dy < 0;
-
-	if (!node->dy)
-		return y <= node->y ? node->dx < 0 : node->dx > 0;
-
-	x -= node->x;
-	y -= node->y;
-
-	// Try to quickly decide by looking at sign bits.
-	// also use a mask to avoid branch prediction
-	INT32 mask = (node->dy ^ node->dx ^ x ^ y) >> 31;
-	return (mask & ((node->dy ^ x) < 0)) |  // (left is negative)
-		(~mask & (FixedMul(y, node->dx>>FRACBITS) >= FixedMul(node->dy>>FRACBITS, x)));
-}
 
 // killough 5/2/98: reformatted
 INT32 R_PointOnSegSide(fixed_t x, fixed_t y, seg_t *restrict line)
@@ -710,18 +689,6 @@ void R_Init(void)
 	framecount = 0;
 }
 
-//
-// R_PointInSubsector
-//
-subsector_t *R_PointInSubsector(fixed_t x, fixed_t y)
-{
-	size_t nodenum = numnodes-1;
-
-	while (!(nodenum & NF_SUBSECTOR))
-		nodenum = nodes[nodenum].children[R_PointOnSide(x, y, nodes+nodenum)];
-
-	return &subsectors[nodenum & ~NF_SUBSECTOR];
-}
 
 //
 // R_IsPointInSubsector, same as above but returns 0 if not in subsector
@@ -759,7 +726,6 @@ subsector_t *R_IsPointInSubsector(fixed_t x, fixed_t y)
 // R_SetupFrame
 //
 
-static mobj_t *viewmobj;
 
 // WARNING: a should be unsigned but to add with 2048, it isn't!
 #define AIMINGTODY(a) ((FINETANGENT((2048+(((INT32)a)>>ANGLETOFINESHIFT)) & FINEMASK)*160)>>FRACBITS)
@@ -806,16 +772,16 @@ void R_SetupFrame(player_t *player, boolean skybox)
 	if (player->awayviewtics)
 	{
 		// cut-away view stuff
-		viewmobj = player->awayviewmobj; // should be a MT_ALTVIEWMAN
-		I_Assert(viewmobj != NULL);
-		newview->z = viewmobj->z + 20*FRACUNIT;
+		r_viewmobj = player->awayviewmobj; // should be a MT_ALTVIEWMAN
+		I_Assert(r_viewmobj != NULL);
+		newview->z = r_viewmobj->z + 20*FRACUNIT;
 		newview->aim = player->awayviewaiming;
-		newview->angle = viewmobj->angle;
+		newview->angle = r_viewmobj->angle;
 	}
 	else if (!player->spectator && chasecam)
 	// use outside cam view
 	{
-		viewmobj = NULL;
+		r_viewmobj = NULL;
 		newview->z = thiscam->z + (thiscam->height>>1);
 		newview->aim = thiscam->aiming;
 		newview->angle = thiscam->angle;
@@ -826,11 +792,11 @@ void R_SetupFrame(player_t *player, boolean skybox)
 	{
 		newview->z = player->viewz;
 
-		viewmobj = player->mo;
-		I_Assert(viewmobj != NULL);
+		r_viewmobj = player->mo;
+		I_Assert(r_viewmobj != NULL);
 
 		newview->aim = player->aiming;
-		newview->angle = viewmobj->angle;
+		newview->angle = r_viewmobj->angle;
 
 		if (!demoplayback && player->playerstate != PST_DEAD)
 		{
@@ -866,13 +832,13 @@ void R_SetupFrame(player_t *player, boolean skybox)
 	}
 	else
 	{
-		newview->x = viewmobj->x;
-		newview->y = viewmobj->y;
+		newview->x = r_viewmobj->x;
+		newview->y = r_viewmobj->y;
 		newview->x += quake.x;
 		newview->y += quake.y;
 
-		if (viewmobj->subsector)
-			newview->sector = viewmobj->subsector->sector;
+		if (r_viewmobj->subsector)
+			newview->sector = r_viewmobj->subsector->sector;
 		else
 			newview->sector = R_PointInSubsector(viewx, viewy)->sector;
 	}
@@ -900,9 +866,9 @@ void R_SkyboxFrame(player_t *player)
 	}
 	// cut-away view stuff
 	newview->sky = true;
-	viewmobj = skyboxmo[0];
+	r_viewmobj = skyboxmo[0];
 #ifdef PARANOIA
-	if (!(viewmobj))
+	if (!(r_viewmobj))
 	{
 		const size_t playeri = (size_t)(player - players);
 		I_Error("R_SkyboxFrame: viewmobj null (player %s)", sizeu1(playeri));
@@ -940,16 +906,16 @@ void R_SkyboxFrame(player_t *player)
 			}
 		}
 	}
-	newview->angle += viewmobj->angle;
+	newview->angle += r_viewmobj->angle;
 
 	newview->player = player;
 
-	newview->x = viewmobj->x;
-	newview->y = viewmobj->y;
+	newview->x = r_viewmobj->x;
+	newview->y = r_viewmobj->y;
 	newview->z = 0;
 
-	if (viewmobj->spawnpoint)
-		newview->z = ((fixed_t)viewmobj->spawnpoint->angle)<<FRACBITS;
+	if (r_viewmobj->spawnpoint)
+		newview->z = ((fixed_t)r_viewmobj->spawnpoint->angle)<<FRACBITS;
 
 	newview->x += quake.x;
 	newview->y += quake.y;
@@ -974,25 +940,25 @@ void R_SkyboxFrame(player_t *player)
 				else if (mh->skybox_scaley < 0)
 					y = (player->awayviewmobj->y - skyboxmo[1]->y) * -mh->skybox_scaley;
 
-				if (viewmobj->angle == 0)
+				if (r_viewmobj->angle == 0)
 				{
 					newview->x += x;
 					newview->y += y;
 
 				}
-				else if (viewmobj->angle == ANGLE_90)
+				else if (r_viewmobj->angle == ANGLE_90)
 				{
 					newview->x -= y;
 					newview->y += x;
 
 				}
-				else if (viewmobj->angle == ANGLE_180)
+				else if (r_viewmobj->angle == ANGLE_180)
 				{
 					newview->x -= x;
 					newview->y -= y;
 
 				}
-				else if (viewmobj->angle == ANGLE_270)
+				else if (r_viewmobj->angle == ANGLE_270)
 				{
 					newview->x += y;
 					newview->y -= x;
@@ -1000,7 +966,7 @@ void R_SkyboxFrame(player_t *player)
 				}
 				else
 				{
-					angle_t ang = viewmobj->angle>>ANGLETOFINESHIFT;
+					angle_t ang = r_viewmobj->angle>>ANGLETOFINESHIFT;
 					newview->x += FixedMul(x,FINECOSINE(ang)) - FixedMul(y,  FINESINE(ang));
 					newview->y += FixedMul(x,  FINESINE(ang)) + FixedMul(y,FINECOSINE(ang));
 
@@ -1026,25 +992,25 @@ void R_SkyboxFrame(player_t *player)
 				else if (mh->skybox_scaley < 0)
 					y = (thiscam->y - skyboxmo[1]->y) * -mh->skybox_scaley;
 
-				if (viewmobj->angle == 0)
+				if (r_viewmobj->angle == 0)
 				{
 					newview->x += x;
 					newview->y += y;
 
 				}
-				else if (viewmobj->angle == ANGLE_90)
+				else if (r_viewmobj->angle == ANGLE_90)
 				{
 					newview->x -= y;
 					newview->y += x;
 
 				}
-				else if (viewmobj->angle == ANGLE_180)
+				else if (r_viewmobj->angle == ANGLE_180)
 				{
 					newview->x -= x;
 					newview->y -= y;
 
 				}
-				else if (viewmobj->angle == ANGLE_270)
+				else if (r_viewmobj->angle == ANGLE_270)
 				{
 					newview->x += y;
 					newview->y -= x;
@@ -1052,7 +1018,7 @@ void R_SkyboxFrame(player_t *player)
 				}
 				else
 				{
-					angle_t ang = viewmobj->angle>>ANGLETOFINESHIFT;
+					angle_t ang = r_viewmobj->angle>>ANGLETOFINESHIFT;
 					newview->x += FixedMul(x,FINECOSINE(ang)) - FixedMul(y,  FINESINE(ang));
 					newview->y += FixedMul(x,  FINESINE(ang)) + FixedMul(y,FINECOSINE(ang));
 
@@ -1077,30 +1043,30 @@ void R_SkyboxFrame(player_t *player)
 				else if (mh->skybox_scaley < 0)
 					y += (player->mo->y - skyboxmo[1]->y) * -mh->skybox_scaley;
 
-				if (viewmobj->angle == 0)
+				if (r_viewmobj->angle == 0)
 				{
 					newview->x -= y;
 					newview->y += x;
 
 				}
-				else if (viewmobj->angle == ANGLE_90)
+				else if (r_viewmobj->angle == ANGLE_90)
 				{
 					newview->x += y;
 					newview->y -= x;
 				}
-				else if (viewmobj->angle == ANGLE_180)
+				else if (r_viewmobj->angle == ANGLE_180)
 				{
 					newview->x += y;
 					newview->y -= x;
 				}
-				else if (viewmobj->angle == ANGLE_270)
+				else if (r_viewmobj->angle == ANGLE_270)
 				{
 					newview->x += y;
 					newview->y -= x;
 				}
 				else
 				{
-					angle_t ang = viewmobj->angle>>ANGLETOFINESHIFT;
+					angle_t ang = r_viewmobj->angle>>ANGLETOFINESHIFT;
 					newview->x += FixedMul(x,FINECOSINE(ang)) - FixedMul(y,  FINESINE(ang));
 					newview->y += FixedMul(x,  FINESINE(ang)) + FixedMul(y,FINECOSINE(ang));
 				}
@@ -1112,8 +1078,8 @@ void R_SkyboxFrame(player_t *player)
 		}
 	}
 
-	if (viewmobj->subsector)
-		newview->sector = viewmobj->subsector->sector;
+	if (r_viewmobj->subsector)
+		newview->sector = r_viewmobj->subsector->sector;
 	else
 		newview->sector = R_PointInSubsector(viewx, viewy)->sector;
 
@@ -1400,6 +1366,7 @@ void R_RegisterEngineStuff(void)
 	CV_RegisterVar(&cv_chasecam2);
 	CV_RegisterVar(&cv_shadow);
 	CV_RegisterVar(&cv_shadowoffs);
+	CV_RegisterVar(&cv_shadowposition);
 	CV_RegisterVar(&cv_skybox);
 
 	CV_RegisterVar(&cv_cam_dist);
@@ -1422,6 +1389,7 @@ void R_RegisterEngineStuff(void)
 	CV_RegisterVar(&cv_cam2_speed);
 	CV_RegisterVar(&cv_cam2_rotate);
 	CV_RegisterVar(&cv_cam2_rotspeed);
+	CV_RegisterVar(&cv_cam2_orbital);
 
 	CV_RegisterVar(&cv_showhud);
 	CV_RegisterVar(&cv_translucenthud);
@@ -1433,29 +1401,4 @@ void R_RegisterEngineStuff(void)
 	CV_RegisterVar(&cv_viewheight); 
 	// Uncapped
 	CV_RegisterVar(&cv_frameinterpolation);
-
-#ifdef HWRENDER
-	// GL-specific Commands
-	CV_RegisterVar(&cv_grgammablue);
-	CV_RegisterVar(&cv_grgammagreen);
-	CV_RegisterVar(&cv_grgammared);
-	CV_RegisterVar(&cv_grfovchange);
-	CV_RegisterVar(&cv_grfog);
-	CV_RegisterVar(&cv_grfogcolor);
-	CV_RegisterVar(&cv_grsoftwarefog);
-#ifdef ALAM_LIGHTING
-	CV_RegisterVar(&cv_grstaticlighting);
-	CV_RegisterVar(&cv_grdynamiclighting);
-	CV_RegisterVar(&cv_grcoronas);
-	CV_RegisterVar(&cv_grcoronasize);
-#endif
-	CV_RegisterVar(&cv_grmd2);
-	CV_RegisterVar(&cv_grspritebillboarding);
-	CV_RegisterVar(&cv_grskydome);
-#endif
-
-#ifdef HWRENDER
-	if (rendermode != render_soft && rendermode != render_none)
-		HWR_AddCommands();
-#endif
 }
