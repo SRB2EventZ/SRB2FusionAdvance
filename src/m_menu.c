@@ -406,7 +406,7 @@ static consvar_t cv_dummycontinues = {"dummycontinues", "0", CV_HIDEN, liveslimi
 static consvar_t cv_dummymares = {"dummymares", "Overall", CV_HIDEN|CV_CALL, dummymares_cons_t, Dummymares_OnChange, 0, NULL, NULL, 0, 0, NULL};
 
 static CV_PossibleValue_t textbox_cons_t[] = {{0, "Solid"}, {1, "GFZROCK"}, {0, NULL}};
-static consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
 // ==========================================================================
 // ORGANIZATION START.
 // ==========================================================================
@@ -1141,26 +1141,29 @@ static menuitem_t OP_VideoOptionsMenu[] =
 {
 	{IT_STRING | IT_CALL,  NULL,   "Video Modes...",      M_VideoModeMenu,     10},
 
-#ifdef HWRENDER
-	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    20},
-#endif
+
 
 #if (defined (__unix__) && !defined (MSDOS)) || defined (UNIXCOMMON) || defined (HAVE_SDL)
-	{IT_STRING|IT_CVAR,      NULL, "Fullscreen",          &cv_fullscreen,    30},
+	{IT_STRING|IT_CVAR,      NULL, "Fullscreen",          &cv_fullscreen,    20},
 #endif
 
 	{IT_STRING | IT_CVAR | IT_CV_SLIDER,
-	                         NULL, "Brightness",          &cv_usegamma,      50},
-	{IT_STRING | IT_CVAR,    NULL, "Draw Distance",       &cv_drawdist, 60},
-	{IT_STRING | IT_CVAR,    NULL, "NiGHTS Draw Dist",    &cv_drawdist_nights, 70},
-	{IT_STRING | IT_CVAR,    NULL, "Precip Draw Dist",    &cv_drawdist_precip, 80},
-	{IT_STRING | IT_CVAR,    NULL, "Precip Density",      &cv_precipdensity, 90},
+	                         NULL, "Brightness",          &cv_usegamma,      35},
+	{IT_STRING | IT_CVAR,    NULL, "Draw Distance",       &cv_drawdist, 45},
+	{IT_STRING | IT_CVAR,    NULL, "NiGHTS Draw Dist",    &cv_drawdist_nights, 55},
+	{IT_STRING | IT_CVAR,    NULL, "Precip Draw Dist",    &cv_drawdist_precip, 65},
+	{IT_STRING | IT_CVAR,    NULL, "Precip Density",      &cv_precipdensity, 75},
 
-	{IT_STRING | IT_CVAR,    NULL, "Show FPS",            &cv_ticrate,    110},
-	{IT_STRING | IT_CVAR,    NULL, "Show TPS",            &cv_tpscounter,    120},
-	{IT_STRING | IT_CVAR,    NULL, "Clear Before Redraw", &cv_homremoval, 130},
-	{IT_STRING | IT_CVAR,    NULL, "Vertical Sync",       &cv_vidwait,    140},
-	{IT_STRING | IT_CVAR,    NULL, "Frame Interpolation",       &cv_frameinterpolation, 150},
+	{IT_STRING | IT_CVAR,    NULL, "Show FPS",            &cv_ticrate,    90},
+	{IT_STRING | IT_CVAR,    NULL, "Show TPS",            &cv_tpscounter,    100},
+	{IT_STRING | IT_CVAR,    NULL, "Clear Before Redraw", &cv_homremoval, 110},
+
+	{IT_STRING | IT_CVAR,    NULL, "Vertical Sync",       &cv_vidwait,    125},
+	{IT_STRING | IT_CVAR,    NULL, "Frame Interpolation",       &cv_frameinterpolation, 135},
+
+	#ifdef HWRENDER
+	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    150},
+	#endif
 };
 
 static menuitem_t OP_VideoModeMenu[] =
@@ -1172,22 +1175,20 @@ static menuitem_t OP_VideoModeMenu[] =
 static menuitem_t OP_OpenGLOptionsMenu[] =
 {
 	{IT_STRING|IT_CVAR,         NULL, "3D Models",    &cv_grmd2,      10},
-	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_grmodellighting,      20},
-	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_grfov,            30},
-	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        40},
-	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     50},
-	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,60},
-	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      70},
-	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      80},
-#ifdef _WINDOWS
-	{IT_STRING|IT_CVAR,         NULL, "Fullscreen",      &cv_fullscreen,       90},
-#endif
+	{IT_STRING|IT_CVAR,         NULL, "Model Interpolation",    &cv_grmodelinterpolation,      20},
+	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_grmodellighting,      30},
+	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_grfov,            50},
+	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        60},
+	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     70},
+	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,80},
+	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      100},
+	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      110},
 
 #ifdef ALAM_LIGHTING
-	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     100},
+	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     130},
 #endif
-	{IT_SUBMENU|IT_STRING,      NULL, "Fog...",          &OP_OpenGLFogDef,          110},
-	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        120},
+	{IT_SUBMENU|IT_STRING,      NULL, "Fog...",          &OP_OpenGLFogDef,          140},
+	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        150},
 };
 
 #ifdef ALAM_LIGHTING
@@ -2890,7 +2891,7 @@ void M_Init(void)
 #ifdef HWRENDER
 	// Permanently hide some options based on render mode
 	if (rendermode == render_soft)
-		OP_VideoOptionsMenu[1].status = IT_DISABLED;
+		OP_VideoOptionsMenu[12].status = IT_DISABLED;
 #endif
 
 #ifndef NONET
