@@ -4102,7 +4102,7 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 	UINT8 alpha;
 	INT32 i;
 	float realtop, realbot, top, bot;
-	float towtop, towbot, towmult;
+	float ttop, tbot, tmult;
 	float bheight;
 	float realheight, heightmult;
 	const sector_t *sector = spr->mobj->subsector->sector;
@@ -4159,24 +4159,24 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 	v2y = FLOAT_TO_FIXED(spr->z2);
 	if (spr->flip)
 	{
-		baseWallVerts[0].sow = baseWallVerts[3].sow = gpatch->max_s;
-		baseWallVerts[2].sow = baseWallVerts[1].sow = 0;
+		baseWallVerts[0].s = baseWallVerts[3].s = gpatch->max_s;
+		baseWallVerts[2].s = baseWallVerts[1].s = 0;
 	}
 	else
 	{
-		baseWallVerts[0].sow = baseWallVerts[3].sow = 0;
-		baseWallVerts[2].sow = baseWallVerts[1].sow = gpatch->max_s;
+		baseWallVerts[0].s = baseWallVerts[3].s = 0;
+		baseWallVerts[2].s = baseWallVerts[1].s = gpatch->max_s;
 	}
 	// flip the texture coords (look familiar?)
 	if (spr->vflip)
 	{
-		baseWallVerts[3].tow = baseWallVerts[2].tow = gpatch->max_t;
-		baseWallVerts[0].tow = baseWallVerts[1].tow = 0;
+		baseWallVerts[3].t = baseWallVerts[2].t = gpatch->max_t;
+		baseWallVerts[0].t = baseWallVerts[1].t = 0;
 	}
 	else
 	{
-		baseWallVerts[3].tow = baseWallVerts[2].tow = 0;
-		baseWallVerts[0].tow = baseWallVerts[1].tow = gpatch->max_t;
+		baseWallVerts[3].t = baseWallVerts[2].t = 0;
+		baseWallVerts[0].t = baseWallVerts[1].t = gpatch->max_t;
 	}
 	// Let dispoffset work first since this adjust each vertex
 	HWR_RotateSpritePolyToAim(spr, baseWallVerts);
@@ -4195,9 +4195,9 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 	}
 	realtop = top = baseWallVerts[3].y;
 	realbot = bot = baseWallVerts[0].y;
-	towtop = baseWallVerts[3].tow;
-	towbot = baseWallVerts[0].tow;
-	towmult = (towbot - towtop) / (top - bot);
+	ttop = baseWallVerts[3].t;
+	tbot = baseWallVerts[0].t;
+	tmult = (tbot - ttop) / (top - bot);
 #ifdef ESLOPE
 	endrealtop = endtop = baseWallVerts[2].y;
 	endrealbot = endbot = baseWallVerts[1].y;
@@ -4208,12 +4208,12 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 	memcpy(wallVerts, baseWallVerts, sizeof(baseWallVerts));
 	if (!cv_translucency.value) // translucency disabled
 	{
-		Surf.FlatColor.s.alpha = 0xFF;
+		Surf.PolyColor.s.alpha = 0xFF;
 		blend = PF_Translucent|PF_Occlude;
 	}
 	else if (spr->mobj->flags2 & MF2_SHADOW)
 	{
-		Surf.FlatColor.s.alpha = 0x40;
+		Surf.PolyColor.s.alpha = 0x40;
 		blend = PF_Translucent;
 	}
 	else if (spr->mobj->frame & FF_TRANSMASK)
@@ -4224,10 +4224,10 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 		//     work properly under glide nor with fogcolor to ffffff :(
 		// Hurdler: PF_Environement would be cool, but we need to fix
 		//          the issue with the fog before
-		Surf.FlatColor.s.alpha = 0xFF;
+		Surf.PolyColor.s.alpha = 0xFF;
 		blend = PF_Translucent|PF_Occlude;
 	}
-	alpha = Surf.FlatColor.s.alpha;
+	alpha = Surf.PolyColor.s.alpha;
 	// Start with the lightlevel and colormap from the top of the sprite
 	lightlevel = *list[sector->numlights - 1].lightlevel;
 	colormap = list[sector->numlights - 1].extra_colormap;
@@ -4310,10 +4310,10 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 			endbot = endrealbot;
 #endif
 #ifdef ESLOPE
-		wallVerts[3].tow = towtop + ((realtop - top) * towmult);
-		wallVerts[2].tow = towtop + ((endrealtop - endtop) * towmult);
-		wallVerts[0].tow = towtop + ((realtop - bot) * towmult);
-		wallVerts[1].tow = towtop + ((endrealtop - endbot) * towmult);
+		wallVerts[3].t = ttop + ((realtop - top) * tmult);
+		wallVerts[2].t = ttop + ((endrealtop - endtop) * tmult);
+		wallVerts[0].t = ttop + ((realtop - bot) * tmult);
+		wallVerts[1].t = ttop + ((endrealtop - endbot) * tmult);
 		wallVerts[3].y = top;
 		wallVerts[2].y = endtop;
 		wallVerts[0].y = bot;
@@ -4338,8 +4338,8 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 			wallVerts[1].z = baseWallVerts[2].z + (baseWallVerts[2].z - baseWallVerts[1].z) * heightmult;
 		}
 #else
-		wallVerts[3].tow = wallVerts[2].tow = towtop + ((realtop - top) * towmult);
-		wallVerts[0].tow = wallVerts[1].tow = towtop + ((realtop - bot) * towmult);
+		wallVerts[3].t = wallVerts[2].t = ttop + ((realtop - top) * tmult);
+		wallVerts[0].t = wallVerts[1].t = ttop + ((realtop - bot) * tmult);
 		wallVerts[2].y = wallVerts[3].y = top;
 		wallVerts[0].y = wallVerts[1].y = bot;
 		// The x and y only need to be adjusted in the case that it's not a papersprite
@@ -4359,11 +4359,12 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 			wallVerts[1].z = baseWallVerts[2].z + (baseWallVerts[2].z - baseWallVerts[1].z) * heightmult;
 		}
 #endif
-		if (colormap)
-			Surf.FlatColor.rgba = HWR_Lighting(lightlevel, colormap->rgba, colormap->fadergba, false, false);
-		else
-			Surf.FlatColor.rgba = HWR_Lighting(lightlevel, NORMALFOG, FADEFOG, false, false);
-		Surf.FlatColor.s.alpha = alpha;
+		HWR_Lighting(&Surf, lightlevel, colormap);
+
+		Surf.PolyColor.s.alpha = alpha;
+
+		HWD.pfnSetShader(3);	// sprite shader
+
 		HWD.pfnDrawPolygon(&Surf, wallVerts, 4, blend|PF_Modulated|PF_Clip);
 		top = bot;
 #ifdef ESLOPE
@@ -4379,25 +4380,24 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 		return;
 	// If we're ever down here, somehow the above loop hasn't draw all the light levels of sprite
 #ifdef ESLOPE
-	wallVerts[3].tow = towtop + ((realtop - top) * towmult);
-	wallVerts[2].tow = towtop + ((endrealtop - endtop) * towmult);
-	wallVerts[0].tow = towtop + ((realtop - bot) * towmult);
-	wallVerts[1].tow = towtop + ((endrealtop - endbot) * towmult);
+	wallVerts[3].t = ttop + ((realtop - top) * tmult);
+	wallVerts[2].t = ttop + ((endrealtop - endtop) * tmult);
+	wallVerts[0].t = ttop + ((realtop - bot) * tmult);
+	wallVerts[1].t = ttop + ((endrealtop - endbot) * tmult);
 	wallVerts[3].y = top;
 	wallVerts[2].y = endtop;
 	wallVerts[0].y = bot;
 	wallVerts[1].y = endbot;
 #else
-	wallVerts[3].tow = wallVerts[2].tow = towtop + ((realtop - top) * towmult);
-	wallVerts[0].tow = wallVerts[1].tow = towtop + ((realtop - bot) * towmult);
+	wallVerts[3].t = wallVerts[2].t = ttop + ((realtop - top) * tmult);
+	wallVerts[0].t = wallVerts[1].t = ttop + ((realtop - bot) * tmult);
 	wallVerts[2].y = wallVerts[3].y = top;
 	wallVerts[0].y = wallVerts[1].y = bot;
 #endif
-	if (colormap)
-		Surf.FlatColor.rgba = HWR_Lighting(lightlevel, colormap->rgba, colormap->fadergba, false, false);
-	else
-		Surf.FlatColor.rgba = HWR_Lighting(lightlevel, NORMALFOG, FADEFOG, false, false);
-	Surf.FlatColor.s.alpha = alpha;
+	
+	HWR_Lighting(&Surf, lightlevel, colormap);
+
+	HWD.pfnSetShader(3);	// sprite shader
 	HWD.pfnDrawPolygon(&Surf, wallVerts, 4, blend|PF_Modulated|PF_Clip);
 }
 
