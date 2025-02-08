@@ -12,40 +12,13 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-//
 //-----------------------------------------------------------------------------
 /// \file
-/// \brief MD2 Handling
-///	Inspired from md2.h by Mete Ciragan (mete@swissquake.ch)
+/// \brief Support to show ENDOOM text
 
-#ifndef _HW_MD2_H_
-#define _HW_MD2_H_
+#ifndef __ENDTXT__
+#define __ENDTXT__
 
-#include "hw_glob.h"
-#include "hw_model.h"
+void ShowEndTxt (void);
 
-#if defined(_MSC_VER)
-#pragma pack()
 #endif
-
-typedef struct
-{
-	char        filename[32];
-	float       scale;
-	float       offset;
-	model_t     *model;
-	void        *grpatch;
-	void        *blendgrpatch;
-	boolean     notfound;
-	INT32       skin;
-} md2_t;
-
-extern md2_t md2_models[NUMSPRITES];
-extern md2_t md2_playermodels[MAXSKINS];
-
-void HWR_InitMD2(void);
-void HWR_DrawMD2(gr_vissprite_t *spr);
-void HWR_AddPlayerMD2(INT32 skin);
-void HWR_AddSpriteMD2(size_t spritenum);
-
-#endif // _HW_MD2_H_
