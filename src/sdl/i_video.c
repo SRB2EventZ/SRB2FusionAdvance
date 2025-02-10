@@ -1538,6 +1538,11 @@ INT32 VID_SetResolution(INT32 width, INT32 height)
 	vid.height = (height < BASEVIDHEIGHT) ? BASEVIDHEIGHT : ((height > MAXVIDHEIGHT) ? MAXVIDHEIGHT : height);
 	vid.modenum = VID_GetModeForSize(width, height);
 
+	src_rect.w = vid.width;
+	src_rect.h = vid.height;
+
+	refresh_rate = VID_GetRefreshRate();
+
 	SDLSetMode(vid.width, vid.height, USE_FULLSCREEN, (setresneeded[2] == 2));
 
 	if (rendermode == render_soft)
