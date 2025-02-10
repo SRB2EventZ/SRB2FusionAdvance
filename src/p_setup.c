@@ -3116,6 +3116,8 @@ boolean P_SetupLevel(boolean skipprecip, boolean reloadinggamestate)
 	if (!reloadinggamestate)
 	{
 		P_InitCamera();
+		localaiming = 0;
+		localaiming2 = 0;
 	}
 
 	if (cv_useranalog.value)
