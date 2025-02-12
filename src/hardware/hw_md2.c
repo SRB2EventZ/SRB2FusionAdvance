@@ -1098,6 +1098,8 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 		}
 		p.anglex = 0.0f;
 #ifdef USE_FTRANSFORM_ANGLEZ
+        if(cv_grmodelrollangle.value)
+		{
 		// Slope rotation from Kart
 		p.anglez = 0.0f;
 		if (spr->mobj->standingslope)
@@ -1106,9 +1108,10 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 			fixed_t tempy = spr->mobj->standingslope->normal.y;
 			fixed_t tempx = spr->mobj->standingslope->normal.x;
 			fixed_t tempangle = AngleFixed(R_PointToAngle2(0, 0, FixedSqrt(FixedMul(tempy, tempy) + FixedMul(tempz, tempz)), tempx));
-			p.anglez = FIXED_TO_FLOAT(tempangle);
+			p.anglez = -FIXED_TO_FLOAT(tempangle);
 			tempangle = -AngleFixed(R_PointToAngle2(0, 0, tempz, tempy));
-			p.anglex = FIXED_TO_FLOAT(tempangle);
+			p.anglex = -FIXED_TO_FLOAT(tempangle);
+		}
 		}
 #endif
 

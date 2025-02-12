@@ -2096,7 +2096,8 @@ static void DrawModelEx(model_t *model, INT32 frameIndex, INT32 duration, INT32 
 	if (flipped)
 		scaley = -scaley;
 #ifdef USE_FTRANSFORM_ANGLEZ
-	pglRotatef(pos->anglez, 0.0f, 0.0f, -1.0f); // rotate by slope from Kart
+if(cv_grmodelrollangle.value)
+	 pglRotatef(pos->anglez, 0.0f, 0.0f, -1.0f); // rotate by slope from Kart
 #endif
 	pglRotatef(pos->anglex, -1.0f, 0.0f, 0.0f);
 	pglRotatef(pos->angley, 0.0f, -1.0f, 0.0f);

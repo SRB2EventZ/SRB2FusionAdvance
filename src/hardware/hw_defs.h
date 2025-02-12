@@ -103,7 +103,7 @@ typedef struct
 //BP: transform order : scale(rotation_x(rotation_y(translation(v))))
 
 // Kart features
-//#define USE_FTRANSFORM_ANGLEZ
+#define USE_FTRANSFORM_ANGLEZ
 //#define USE_FTRANSFORM_MIRROR
 
 // Vanilla features

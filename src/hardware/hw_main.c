@@ -163,6 +163,9 @@ consvar_t cv_grmodelinterpolation = {"gr_modelinterpolation", "Sometimes", CV_SA
 consvar_t cv_grspritebillboarding = {"gr_spritebillboarding", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_grskydome = {"gr_skydome", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL}; //now off by default
 
+
+consvar_t cv_grmodelrollangle = {"gr_modelrollangle", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+
 static void CV_FogDensity_ONChange(void)
 {
   if (rendermode == render_opengl)
@@ -6593,6 +6596,7 @@ void HWR_AddCommands(void)
 	CV_RegisterVar(&cv_grmodelinterpolation);
 	CV_RegisterVar(&cv_grspritebillboarding);
 	CV_RegisterVar(&cv_grskydome);
+	CV_RegisterVar(&cv_grmodelrollangle);
 }
 
 static inline void HWR_AddEngineCommands(void)
