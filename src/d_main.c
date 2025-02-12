@@ -245,8 +245,14 @@ static void D_Display(void)
 
 
 
-	// check for change of screen size (video mode)
-	if (setmodeneeded && !wipe)
+	// check for change of screen size
+	if (setresneeded[2] && !wipe)
+	{
+		// change resolution (interface-dependent function)
+		VID_SetResolution(setresneeded[0], setresneeded[1]);
+		setresneeded[2] = 0;
+	}
+	else if (setmodeneeded && !wipe)
 		SCR_SetMode(); // change video mode
 
 	if (vid.recalc)
@@ -535,7 +541,7 @@ void D_SRB2Loop(void)
 	con_startup = false;
 
 	// make sure to do a d_display to init mode _before_ load a level
-	SCR_SetMode(); // change video mode
+	SCR_SetResolution(); // change video resolution
 	SCR_Recalc();
 
 	// Check and print which version is executed.

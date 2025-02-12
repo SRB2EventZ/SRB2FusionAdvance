@@ -98,6 +98,7 @@ extern consvar_t cv_grfovchange;
 extern consvar_t cv_grsolvetjoin;
 extern consvar_t cv_grshearing;
 extern consvar_t cv_grspritebillboarding;
+extern consvar_t cv_grmodelrollangle;
 extern consvar_t cv_grmodellighting;
 extern consvar_t cv_grskydome;
 extern consvar_t cv_glloadingscreen;

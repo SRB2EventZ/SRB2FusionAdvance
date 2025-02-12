@@ -6,22 +6,28 @@ This build is maintained by members of the [Super SRB2 Games Z community](https:
 
 # What does this build have that makes it stand out?
 
+
+  
 * ## Uncapped Framerate
 
   A port of the Uncapped Framerate from Version 2.2/SRB2Kart! Now you can play at your monitor's refresh rate, making for an overall smoother experience!
 
   ![Screenshot_20241209_161237](https://github.com/user-attachments/assets/e21bd580-f47b-4955-b2ac-e22c902f718e)
 
-  (originally ported by chromaticpipe, original source [here](https://github.com/chromaticpipe/srb2-legacy-additions/tree/uncapped), video by July2612 [here.](https://youtu.be/XOEXgPFcpW0))
+  (originally ported by chromaticpipe, original source [here](https://github.com/chromaticpipe/srb2-legacy-additions/tree/uncapped), video by July2612 [here.](https://youtu.be/XOEXgPFcpW0)) 
+
+* ## Dynamic Resolutions
+
+  Supports custom resolutions and resizable windows up to 3840x2560
+
+  ![srb20008](https://github.com/user-attachments/assets/42c1ae7a-dcf6-42b0-bdf2-f7f087c6a90c)
+
 
 * ## OpenGL Shaders
 
     So OpenGL doesn't suck AS bad
     ![srb20266](https://github.com/user-attachments/assets/3ab23525-41ad-411f-9388-b3a0726bb63e)
-
-     
-
-
+   
 * ## Orbital Camera
 
   This camera orbits around the player instead of panning, making looking around in third person way easier! Enable with the `cam_orbital` cvar in the console. (WARNING: Might look strange in software. OpenGL is preferred for this camera option.)
