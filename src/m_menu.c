@@ -1185,13 +1185,16 @@ static menuitem_t OP_OpenGLOptionsMenu[] =
 	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        100},
 	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     110},
 	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,120},
-	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      150},
-	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      160},
+	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      140},
+	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      150},
 
 #ifdef ALAM_LIGHTING
-	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     180},
+	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     170},
+	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        180},
+#else
+	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        170},
 #endif
-	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        190},
+	
 };
 
 #ifdef ALAM_LIGHTING
