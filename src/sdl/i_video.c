@@ -1511,6 +1511,7 @@ INT32 VID_SetResolution(INT32 width, INT32 height)
 	vid.modenum = VID_GetModeForSize(width, height);
 
 	SDLSetMode(vid.width, vid.height, USE_FULLSCREEN, (setresneeded[2] == 2));
+	Impl_VideoSetupBuffer();
 
 	if (rendermode == render_soft)
 	{
