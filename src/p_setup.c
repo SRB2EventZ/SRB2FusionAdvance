@@ -3025,6 +3025,10 @@ boolean P_SetupLevel(boolean skipprecip, boolean reloadinggamestate)
 		// Correct missing sidedefs & deep water trick
 		HWR_CorrectSWTricks();
 		HWR_CreatePlanePolygons((INT32)numnodes - 1);
+
+			// Build the sky dome
+		HWR_ClearSkyDome();
+		HWR_BuildSkyDome();
 	}
 #endif
 

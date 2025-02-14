@@ -23,6 +23,7 @@
 #include "p_polyobj.h"
 #endif 
 #include "z_zone.h"
+#include "hardware/hw_main.h" //cv_grshearing
 
 static viewvars_t p1view_old;
 static viewvars_t p1view_new;
@@ -80,8 +81,7 @@ static vector3_t *R_LerpVector3(const vector3_t *from, const vector3_t *to, fixe
 }
 
 // taken from r_main.c
-// WARNING: a should be unsigned but to add with 2048, it isn't!
-#define AIMINGTODY(a) ((FINETANGENT((2048+(((INT32)a)>>ANGLETOFINESHIFT)) & FINEMASK)*160)>>FRACBITS)
+
 
 void R_InterpolateView(player_t *player, boolean skybox, fixed_t frac)
 {
@@ -121,18 +121,27 @@ void R_InterpolateView(player_t *player, boolean skybox, fixed_t frac)
 	viewsector = R_PointInSubsector(viewx, viewy)->sector;
 	viewsky = newview->sky;
 
+	
+	// clip it in the case we are looking a hardware 90 degrees full aiming
+	// (lmps, network and use F12...)
+	if (rendermode == render_soft
+#ifdef HWRENDER
+		|| cv_grshearing.value
+#endif
+		)
+	{
+		G_SoftwareClipAimingPitch((INT32 *)&aimingangle);
+	}
+
 	if (rendermode == render_soft)
 	{
-		// clip it in the case we are looking a hardware 90 degrees full aiming
-		// (lmps, network and use F12...)
-		G_SoftwareClipAimingPitch((INT32 *)&aimingangle);
-
-		dy = AIMINGTODY(aimingangle) * viewwidth/BASEVIDWIDTH;
-
+		dy = (AIMINGTODY(aimingangle)>>FRACBITS) * viewwidth/BASEVIDWIDTH;
 		yslope = &yslopetab[viewheight*8 - (viewheight/2 + dy)];
 	}
+
 	centery = (viewheight/2) + dy;
 	centeryfrac = centery<<FRACBITS;
+
 }
 
 void R_UpdateViewInterpolation(void)

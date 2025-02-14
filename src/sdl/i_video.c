@@ -358,11 +358,6 @@ static INT32 Impl_SDL_Scancode_To_Keycode(SDL_Scancode code)
 		case SDL_SCANCODE_RGUI:   return KEY_RIGHTWIN;
 		default:                  break;
 	}
-#ifdef HWRENDER
-	DBG_Printf("Unknown incoming scancode: %d, represented %c\n",
-				code,
-				SDL_GetKeyName(SDL_GetKeyFromScancode(code)));
-#endif
 	return 0;
 }
 
@@ -1511,6 +1506,7 @@ INT32 VID_SetResolution(INT32 width, INT32 height)
 	vid.modenum = VID_GetModeForSize(width, height);
 
 	SDLSetMode(vid.width, vid.height, USE_FULLSCREEN, (setresneeded[2] == 2));
+	Impl_VideoSetupBuffer();
 
 	if (rendermode == render_soft)
 	{
@@ -1781,6 +1777,7 @@ void I_StartupGraphics(void)
 		HWD.pfnFinishUpdate     = NULL;
 		HWD.pfnDraw2DLine       = hwSym("Draw2DLine",NULL);
 		HWD.pfnDrawPolygon      = hwSym("DrawPolygon",NULL);
+		HWD.pfnDrawIndexedTriangles = hwSym("DrawIndexedTriangles",NULL);
 		HWD.pfnRenderSkyDome    = hwSym("RenderSkyDome",NULL);
 		HWD.pfnSetBlend         = hwSym("SetBlend",NULL);
 		HWD.pfnClearBuffer      = hwSym("ClearBuffer",NULL);
@@ -1794,7 +1791,6 @@ void I_StartupGraphics(void)
 		HWD.pfnDrawModel        = hwSym("DrawModel",NULL);
 		HWD.pfnCreateModelVBOs  = hwSym("CreateModelVBOs",NULL);
 		HWD.pfnSetTransform     = hwSym("SetTransform",NULL);
-		HWD.pfnGetRenderVersion = hwSym("GetRenderVersion",NULL);
 		HWD.pfnPostImgRedraw    = hwSym("PostImgRedraw",NULL);
 		HWD.pfnFlushScreenTextures=hwSym("FlushScreenTextures",NULL);
 		HWD.pfnStartScreenWipe  = hwSym("StartScreenWipe",NULL);
@@ -1804,10 +1800,14 @@ void I_StartupGraphics(void)
 		HWD.pfnMakeScreenTexture= hwSym("MakeScreenTexture",NULL);
 		HWD.pfnMakeScreenFinalTexture=hwSym("MakeScreenFinalTexture",NULL);
 		HWD.pfnDrawScreenFinalTexture=hwSym("DrawScreenFinalTexture",NULL);
-		// check gl renderer lib
-		if (HWD.pfnGetRenderVersion() != VERSION)
-			I_Error("%s", M_GetText("The version of the renderer doesn't match the version of the executable\nBe sure you have installed SRB2 properly.\n"));
-		if (!HWD.pfnInit(I_Error)) // let load the OpenGL library
+		HWD.pfnCompileShaders   = hwSym("CompileShaders",NULL);
+		HWD.pfnCleanShaders     = hwSym("CleanShaders",NULL);
+		HWD.pfnSetShader = hwSym("SetShader",NULL);
+		HWD.pfnUnSetShader = hwSym("UnSetShader",NULL);
+		HWD.pfnSetShaderInfo    = hwSym("SetShaderInfo",NULL);
+		HWD.pfnLoadCustomShader = hwSym("LoadCustomShader",NULL);
+
+		if (!HWD.pfnInit()) // load the OpenGL library
 		{
 			rendermode = render_soft;
 		}
