@@ -4684,7 +4684,7 @@ static inline void HWR_DrawPrecipitationSprite(gr_vissprite_t *spr)
 				colormap = sector->extra_colormap;
 		}
 
-	HWR_Lighting(&Surf, lightlevel, colormap);	
+		HWR_Lighting(&Surf, lightlevel, colormap);	
 	}
 
 	if (spr->mobj->flags2 & MF2_SHADOW)
@@ -5501,32 +5501,27 @@ static void HWR_ProjectPrecipitationSprite(precipmobj_t *thing)
 	spriteframe_t *sprframe;
 	size_t lumpoff;
 	unsigned rot = 0;
-	UINT8 flip; 
-
-		if (!thing)
-		return;
+	UINT8 flip;
 
 	// uncapped/interpolation
-    interpmobjstate_t interp = {0};
+	interpmobjstate_t interp = {0};
+
+	if (!thing)
+		return;
 
 	// do interpolation
-	if (R_UsingFrameInterpolation())
+	if (R_UsingFrameInterpolation() && !paused)
 	{
 		R_InterpolatePrecipMobjState(thing, rendertimefrac, &interp);
 	}
-		else
+	else
 	{
 		R_InterpolatePrecipMobjState(thing, FRACUNIT, &interp);
 	}
 
-
-
-
-
 	// transform the origin point
 	tr_x = FIXED_TO_FLOAT(interp.x) - gr_viewx;
 	tr_y = FIXED_TO_FLOAT(interp.y) - gr_viewy;
-
 
 	// rotation around vertical axis
 	tz = (tr_x * gr_viewcos) + (tr_y * gr_viewsin);
@@ -5537,7 +5532,6 @@ static void HWR_ProjectPrecipitationSprite(precipmobj_t *thing)
 
 	tr_x = FIXED_TO_FLOAT(interp.x);
 	tr_y = FIXED_TO_FLOAT(interp.y);
-
 
 	// decide which patch to use for sprite relative to player
 	if ((unsigned)thing->sprite >= numsprites)
@@ -5609,8 +5603,8 @@ static void HWR_ProjectPrecipitationSprite(precipmobj_t *thing)
 	vis->colormap = colormaps;
 
 	// set top/bottom coords
-	vis->ty = FIXED_TO_FLOAT(interp.z + spritecachedinfo[lumpoff].topoffset);
-
+	vis->ty = FIXED_TO_FLOAT(thing->z + spritecachedinfo[lumpoff].topoffset);
+	
 	vis->precip = true;
 }
 #endif
