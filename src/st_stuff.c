@@ -854,6 +854,9 @@ static void ST_drawInput(void)
 
 	INT32 x = hudinfo[HUD_INPUT].x, y = hudinfo[HUD_INPUT].y;
 
+	if (hu_showscores)
+		return;
+
 	if(stplyr->pflags & PF_NIGHTSMODE)
 	y += 8;
 	else if (modeattacking 
