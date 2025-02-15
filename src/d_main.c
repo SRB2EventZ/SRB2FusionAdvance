@@ -151,6 +151,7 @@ char srb2path[256] = ".";
 #endif
 boolean usehome = true;
 const char *pandf = "%s" PATHSEP "%s";
+static char addonsdir[MAX_WADPATH];
 
 //
 // EVENT HANDLING
@@ -244,8 +245,14 @@ static void D_Display(void)
 
 
 
-	// check for change of screen size (video mode)
-	if (setmodeneeded && !wipe)
+	// check for change of screen size
+	if (setresneeded[2] && !wipe)
+	{
+		// change resolution (interface-dependent function)
+		VID_SetResolution(setresneeded[0], setresneeded[1]);
+		setresneeded[2] = 0;
+	}
+	else if (setmodeneeded && !wipe)
 		SCR_SetMode(); // change video mode
 
 	if (vid.recalc)
@@ -534,7 +541,7 @@ void D_SRB2Loop(void)
 	con_startup = false;
 
 	// make sure to do a d_display to init mode _before_ load a level
-	SCR_SetMode(); // change video mode
+	SCR_SetResolution(); // change video resolution
 	SCR_Recalc();
 
 	// Check and print which version is executed.
@@ -999,7 +1006,7 @@ void D_SRB2Main(void)
 #endif
 
 	// for dedicated server
-#if !defined (_WINDOWS) //already check in win_main.c
+#if !defined (_WINDOWS) && !defined(DEDICATED) //already check in win_main.c
 	dedicated = M_CheckParm("-dedicated") != 0;
 #endif
 
@@ -1058,7 +1065,6 @@ void D_SRB2Main(void)
 			// can't use sprintf since there is %u in savegamename
 			strcatbf(savegamename, srb2home, PATHSEP);
 
-			I_mkdir(srb2home, 0700);
 #else
 			snprintf(srb2home, sizeof srb2home, "%s", userhome);
 			snprintf(downloaddir, sizeof downloaddir, "%s", userhome);
@@ -1078,6 +1084,11 @@ void D_SRB2Main(void)
 	strcpy(downloaddir, "/ram"); // the dreamcast's TMP
 #endif
 	}
+
+
+	// Create addons dir
+	snprintf(addonsdir, sizeof addonsdir, "%s%s%s", srb2home, PATHSEP, "addons");
+	I_mkdir(addonsdir, 0755);
 
 	// rand() needs seeded regardless of password
 	srand((unsigned int)time(NULL));
@@ -1202,6 +1213,13 @@ void D_SRB2Main(void)
 
 	CONS_Printf("I_StartupGraphics()...\n");
 	I_StartupGraphics();
+
+#ifdef HWRENDER
+	// Lactozilla: Add every hardware mode CVAR and CCMD.
+	// Has to be done before the configuration file loads,
+	// but after the OpenGL library loads.
+	HWR_AddCommands();
+#endif
 
 	//--------------------------------------------------------- CONSOLE
 	// setup loading screen

@@ -217,6 +217,9 @@ extern description_t description[MAXSKINS];
 extern consvar_t cv_newgametype, cv_nextmap, cv_chooseskin, cv_serversort;
 extern CV_PossibleValue_t gametype_cons_t[];
 
+
+extern consvar_t cv_textboxstyle; //idk where to put this, so whatever
+
 extern INT16 startmap;
 extern INT32 ultimate_selectable;
 
@@ -233,6 +236,9 @@ void Screenshot_option_Onchange(void);
 
 // Addons menu updating
 void Addons_option_Onchange(void);
+
+// Moviemode menu updating
+void Moviemode_option_Onchange(void);
 
 // These defines make it a little easier to make menus
 #define DEFAULTMENUSTYLE(header, source, prev, x, y)\

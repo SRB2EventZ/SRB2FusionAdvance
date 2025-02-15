@@ -2830,6 +2830,8 @@ boolean P_SetupLevel(boolean skipprecip)
 	// clear the splats from previous level
 	R_ClearLevelSplats();
 #endif
+
+	mobjcache = NULL;
     R_InitializeLevelInterpolators();
 	P_InitThinkers();
 	R_InitMobjInterpolators();
@@ -2979,6 +2981,10 @@ boolean P_SetupLevel(boolean skipprecip)
 		// Correct missing sidedefs & deep water trick
 		HWR_CorrectSWTricks();
 		HWR_CreatePlanePolygons((INT32)numnodes - 1);
+
+			// Build the sky dome
+		HWR_ClearSkyDome();
+		HWR_BuildSkyDome();
 	}
 #endif
 

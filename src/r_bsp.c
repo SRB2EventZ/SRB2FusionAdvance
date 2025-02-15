@@ -862,7 +862,7 @@ static void R_Subsector(size_t num)
 	// Check and prep all 3D floors. Set the sector floor/ceiling light levels and colormaps.
 	if (frontsector->ffloors)
 	{
-				boolean anyMoved = frontsector->moved;
+		boolean anyMoved = frontsector->moved;
 		if (anyMoved == false)
 		{
 			for (rover = frontsector->ffloors; rover; rover = rover->next)
@@ -1097,9 +1097,9 @@ static void R_Subsector(size_t num)
 
 				light = R_GetPlaneLight(frontsector, polysec->floorheight, viewz < polysec->floorheight);
 				ffloor[numffloors].plane = R_FindPlane(polysec->floorheight, polysec->floorpic,
-						polysec->lightlevel, xoff, yoff,
+						(light == -1 ? frontsector->lightlevel : *frontsector->lightlist[light].lightlevel), xoff, yoff,
 						polysec->floorpic_angle-po->angle,
-						NULL,
+						(light == -1 ? frontsector->extra_colormap : frontsector->lightlist[light].extra_colormap),
 						NULL
 #ifdef POLYOBJECTS_PLANES
 					, po
@@ -1142,10 +1142,10 @@ static void R_Subsector(size_t num)
 					yoff += po->centerPt.y;
 				}
 
-				light = R_GetPlaneLight(frontsector, polysec->ceilingheight, viewz < polysec->ceilingheight);
+				light = R_GetPlaneLight(frontsector, polysec->floorheight, viewz < polysec->floorheight);
 				ffloor[numffloors].plane = R_FindPlane(polysec->ceilingheight, polysec->ceilingpic,
-					polysec->lightlevel, xoff, yoff, polysec->ceilingpic_angle-po->angle,
-					NULL, NULL
+					(light == -1 ? frontsector->lightlevel : *frontsector->lightlist[light].lightlevel), xoff, yoff, polysec->ceilingpic_angle-po->angle,
+					(light == -1 ? frontsector->extra_colormap : frontsector->lightlist[light].extra_colormap), NULL
 #ifdef POLYOBJECTS_PLANES
 					, po
 #endif
@@ -1401,7 +1401,7 @@ void R_RenderBSPNode(INT32 bspnum)
 		bsp = &nodes[bspnum];
 
 		// Decide which side the view point is on.
-		side = R_PointOnSide(viewx, viewy, bsp);
+		side = R_PointOnSideFast(viewx, viewy, bsp);
 		// Recursively divide front space.
 		R_RenderBSPNode(bsp->children[side]);
 

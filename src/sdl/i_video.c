@@ -176,7 +176,7 @@ static SDL_bool Impl_CreateWindow(SDL_bool fullscreen);
 //static void Impl_SetWindowName(const char *title);
 static void Impl_SetWindowIcon(void);
 
-static void SDLSetMode(INT32 width, INT32 height, SDL_bool fullscreen)
+static void SDLSetMode(INT32 width, INT32 height, SDL_bool fullscreen, SDL_bool centerscreen)
 {
 	static SDL_bool wasfullscreen = SDL_FALSE;
 	Uint32 rmask;
@@ -205,10 +205,13 @@ static void SDLSetMode(INT32 width, INT32 height, SDL_bool fullscreen)
 			}
 			// Reposition window only in windowed mode
 			SDL_SetWindowSize(window, width, height);
-			SDL_SetWindowPosition(window,
-				SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(window)),
-				SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(window))
-			);
+			if (centerscreen)
+			{
+				SDL_SetWindowPosition(window,
+					SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(window)),
+					SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(window))
+				);
+			}
 		}
 	}
 	else
@@ -355,11 +358,6 @@ static INT32 Impl_SDL_Scancode_To_Keycode(SDL_Scancode code)
 		case SDL_SCANCODE_RGUI:   return KEY_RIGHTWIN;
 		default:                  break;
 	}
-#ifdef HWRENDER
-	DBG_Printf("Unknown incoming scancode: %d, represented %c\n",
-				code,
-				SDL_GetKeyName(SDL_GetKeyFromScancode(code)));
-#endif
 	return 0;
 }
 
@@ -580,6 +578,11 @@ static void Impl_HandleWindowEvent(SDL_WindowEvent evt)
 		case SDL_WINDOWEVENT_FOCUS_LOST:
 			kbfocus = SDL_FALSE;
 			mousefocus = SDL_FALSE;
+			break;
+		case SDL_WINDOWEVENT_RESIZED:
+			setresneeded[0] = evt.data1;
+			setresneeded[1] = evt.data2;
+			setresneeded[2] = 1;
 			break;
 		case SDL_WINDOWEVENT_MAXIMIZED:
 			break;
@@ -884,6 +887,7 @@ static void Impl_HandleTextEvent(SDL_TextInputEvent evt)
 void I_GetEvent(void)
 {
 	SDL_Event evt;
+	char* dropped_filedir;
 	// We only want the first motion event,
 	// otherwise we'll end up catching the warp back to center.
 	//int mouseMotionOnce = 0;
@@ -1063,6 +1067,11 @@ void I_GetEvent(void)
 				if (currentMenu == &OP_JoystickSetDef)
 					M_SetupJoystickMenu(0);
 			 	break;
+			case SDL_DROPFILE:
+				dropped_filedir = evt.drop.file;
+				COM_BufInsertText(va("addfile \"%s\"", dropped_filedir));
+				SDL_free(dropped_filedir);    // Free dropped_filedir memory
+				break;
 			case SDL_QUIT:
 				I_Quit();
 				M_QuitResponse('y');
@@ -1468,7 +1477,7 @@ INT32 VID_SetMode(INT32 modeNum)
 	}
 	//Impl_SetWindowName("SRB2 "VERSIONSTRING);
 
-	SDLSetMode(vid.width, vid.height, USE_FULLSCREEN);
+	SDLSetMode(vid.width, vid.height, USE_FULLSCREEN, SDL_TRUE);
 	Impl_VideoSetupBuffer();
 
 	if (rendermode == render_soft)
@@ -1479,6 +1488,35 @@ INT32 VID_SetMode(INT32 modeNum)
 			bufSurface = NULL;
 		}
 
+	}
+
+	return SDL_TRUE;
+}
+
+// VID_SetMode but no video modes
+INT32 VID_SetResolution(INT32 width, INT32 height)
+{
+	SDLdoUngrabMouse();
+
+	vid.recalc = 1;
+	vid.bpp = 1;
+
+	vid.width = (width < BASEVIDWIDTH) ? BASEVIDWIDTH : ((width > MAXVIDWIDTH) ? MAXVIDWIDTH : width);
+	vid.height = (height < BASEVIDHEIGHT) ? BASEVIDHEIGHT : ((height > MAXVIDHEIGHT) ? MAXVIDHEIGHT : height);
+	vid.modenum = VID_GetModeForSize(width, height);
+
+	SDLSetMode(vid.width, vid.height, USE_FULLSCREEN, (setresneeded[2] == 2));
+	Impl_VideoSetupBuffer();
+
+	if (rendermode == render_soft)
+	{
+		if (bufSurface)
+		{
+			SDL_FreeSurface(bufSurface);
+			bufSurface = NULL;
+		}
+
+		Impl_VideoSetupBuffer();
 	}
 
 	return SDL_TRUE;
@@ -1504,6 +1542,8 @@ static SDL_bool Impl_CreateWindow(SDL_bool fullscreen)
 	if (rendermode == render_opengl)
 		flags |= SDL_WINDOW_OPENGL;
 #endif
+
+	flags |= SDL_WINDOW_RESIZABLE;
 
 	// Create a window
 	window = SDL_CreateWindow("SRB2 Fusion Advance "VERSIONSTRING, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -1737,6 +1777,7 @@ void I_StartupGraphics(void)
 		HWD.pfnFinishUpdate     = NULL;
 		HWD.pfnDraw2DLine       = hwSym("Draw2DLine",NULL);
 		HWD.pfnDrawPolygon      = hwSym("DrawPolygon",NULL);
+		HWD.pfnDrawIndexedTriangles = hwSym("DrawIndexedTriangles",NULL);
 		HWD.pfnRenderSkyDome    = hwSym("RenderSkyDome",NULL);
 		HWD.pfnSetBlend         = hwSym("SetBlend",NULL);
 		HWD.pfnClearBuffer      = hwSym("ClearBuffer",NULL);
@@ -1750,7 +1791,6 @@ void I_StartupGraphics(void)
 		HWD.pfnDrawModel        = hwSym("DrawModel",NULL);
 		HWD.pfnCreateModelVBOs  = hwSym("CreateModelVBOs",NULL);
 		HWD.pfnSetTransform     = hwSym("SetTransform",NULL);
-		HWD.pfnGetRenderVersion = hwSym("GetRenderVersion",NULL);
 		HWD.pfnPostImgRedraw    = hwSym("PostImgRedraw",NULL);
 		HWD.pfnFlushScreenTextures=hwSym("FlushScreenTextures",NULL);
 		HWD.pfnStartScreenWipe  = hwSym("StartScreenWipe",NULL);
@@ -1760,10 +1800,14 @@ void I_StartupGraphics(void)
 		HWD.pfnMakeScreenTexture= hwSym("MakeScreenTexture",NULL);
 		HWD.pfnMakeScreenFinalTexture=hwSym("MakeScreenFinalTexture",NULL);
 		HWD.pfnDrawScreenFinalTexture=hwSym("DrawScreenFinalTexture",NULL);
-		// check gl renderer lib
-		if (HWD.pfnGetRenderVersion() != VERSION)
-			I_Error("%s", M_GetText("The version of the renderer doesn't match the version of the executable\nBe sure you have installed SRB2 properly.\n"));
-		if (!HWD.pfnInit(I_Error)) // let load the OpenGL library
+		HWD.pfnCompileShaders   = hwSym("CompileShaders",NULL);
+		HWD.pfnCleanShaders     = hwSym("CleanShaders",NULL);
+		HWD.pfnSetShader = hwSym("SetShader",NULL);
+		HWD.pfnUnSetShader = hwSym("UnSetShader",NULL);
+		HWD.pfnSetShaderInfo    = hwSym("SetShaderInfo",NULL);
+		HWD.pfnLoadCustomShader = hwSym("LoadCustomShader",NULL);
+
+		if (!HWD.pfnInit()) // load the OpenGL library
 		{
 			rendermode = render_soft;
 		}

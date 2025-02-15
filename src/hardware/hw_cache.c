@@ -22,6 +22,7 @@
 #ifdef HWRENDER
 #include "hw_glob.h"
 #include "hw_drv.h"
+#include "hw_batching.h"
 
 #include "../doomstat.h"    //gamemode
 #include "../i_video.h"     //rendermode
@@ -513,14 +514,43 @@ void HWR_InitTextureCache(void)
 // Callback function for HWR_FreeTextureCache.
 static void FreeMipmapColormap(INT32 patchnum, void *patch)
 {
-	GLPatch_t* const grpatch = patch;
+	GLPatch_t* const pat = patch;
 	(void)patchnum; //unused
-	while (grpatch->mipmap.nextcolormap)
+
+	// The patch must be valid, obviously
+	if (!pat)
+		return;
+
+	// The mipmap must be valid, obviously
+	while (&pat->mipmap)
 	{
-		GLMipmap_t *grmip = grpatch->mipmap.nextcolormap;
-		grpatch->mipmap.nextcolormap = grmip->nextcolormap;
-		if (grmip->grInfo.data) Z_Free(grmip->grInfo.data);
-		free(grmip);
+		// Confusing at first, but pat->mipmap->nextcolormap
+		// at the beginning of the loop is the first colormap
+		// from the linked list of colormaps.
+		GLMipmap_t *next = NULL;
+
+		// No mipmap in this patch, break out of the loop.
+		if (!&pat->mipmap)
+			break;
+
+		// No colormap mipmaps either.
+		if (!pat->mipmap.nextcolormap)
+			break;
+
+		// Set the first colormap to the one that comes after it.
+		next = pat->mipmap.nextcolormap;
+		if (!next)
+			break;
+
+		pat->mipmap.nextcolormap = next->nextcolormap;
+
+		// Free image data from memory.
+		if (next->grInfo.data)
+			Z_Free(next->grInfo.data);
+		next->grInfo.data = NULL;
+
+		// Free the old colormap mipmap from memory.
+		free(next);
 	}
 }
 
@@ -600,7 +630,11 @@ GLTexture_t *HWR_GetTexture(INT32 tex)
 	if (!grtex->mipmap.grInfo.data && !grtex->mipmap.downloaded)
 		HWR_GenerateTexture(tex, grtex);
 
-	HWD.pfnSetTexture(&grtex->mipmap);
+	// If hardware does not have the texture, then call pfnSetTexture to upload it
+	if (!grtex->mipmap.downloaded)
+		HWD.pfnSetTexture(&grtex->mipmap);
+	
+	HWR_SetCurrentTexture(&grtex->mipmap);
 
 	// The system-memory data can be purged now.
 	Z_ChangeTag(grtex->mipmap.grInfo.data, PU_HWRCACHE_UNLOCKED);
@@ -665,7 +699,11 @@ void HWR_GetFlat(lumpnum_t flatlumpnum)
 	if (!grmip->downloaded && !grmip->grInfo.data)
 		HWR_CacheFlat(grmip, flatlumpnum);
 
-	HWD.pfnSetTexture(grmip);
+	// If hardware does not have the texture, then call pfnSetTexture to upload it
+	if (!grmip->downloaded)
+		HWD.pfnSetTexture(grmip);
+	
+	HWR_SetCurrentTexture(grmip);
 
 	// The system-memory data can be purged now.
 	Z_ChangeTag(grmip->grInfo.data, PU_HWRCACHE_UNLOCKED);
@@ -685,7 +723,11 @@ static void HWR_LoadMappedPatch(GLMipmap_t *grmip, GLPatch_t *gpatch)
 		Z_Free(patch);
 	}
 
-	HWD.pfnSetTexture(grmip);
+	// If hardware does not have the texture, then call pfnSetTexture to upload it
+	if (!grmip->downloaded)
+		HWD.pfnSetTexture(grmip);
+	
+	HWR_SetCurrentTexture(grmip);
 
 	// The system-memory data can be purged now.
 	Z_ChangeTag(grmip->grInfo.data, PU_HWRCACHE_UNLOCKED);

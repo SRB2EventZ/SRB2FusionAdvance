@@ -143,6 +143,7 @@ static CV_PossibleValue_t precipdensity_cons_t[] = {{0, "None"}, {1, "Light"}, {
 static CV_PossibleValue_t translucenthud_cons_t[] = {{0, "MIN"}, {10, "MAX"}, {0, NULL}};
 static CV_PossibleValue_t maxportals_cons_t[] = {{0, "MIN"}, {12, "MAX"}, {0, NULL}}; // lmao rendering 32 portals, you're a card
 static CV_PossibleValue_t homremoval_cons_t[] = {{0, "No"}, {1, "Yes"}, {2, "Flash"}, {0, NULL}};
+static CV_PossibleValue_t shadowposition_cons_t[] = {{0, "Static"}, {1, "Camera"}, {0, NULL}};
 
 static void ChaseCam_OnChange(void);
 static void ChaseCam2_OnChange(void);
@@ -158,6 +159,7 @@ consvar_t cv_flipcam = {"flipcam", "No", CV_SAVE|CV_CALL|CV_NOINIT, CV_YesNo, Fl
 consvar_t cv_flipcam2 = {"flipcam2", "No", CV_SAVE|CV_CALL|CV_NOINIT, CV_YesNo, FlipCam2_OnChange, 0, NULL, NULL, 0, 0, NULL};
 
 consvar_t cv_shadow = {"shadow", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_shadowposition = {"shadowposition", "Static", CV_SAVE, shadowposition_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_shadowoffs = {"offsetshadows", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_skybox = {"skybox", "On", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_soniccd = {"soniccd", "Off", CV_NETVAR, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
@@ -247,31 +249,6 @@ static void FlipCam2_OnChange(void)
 	SendWeaponPref2();
 }
 
-//
-// R_PointOnSide
-// Traverse BSP (sub) tree,
-// check point against partition plane.
-// Returns side 0 (front) or 1 (back).
-//
-// killough 5/2/98: reformatted
-//
-INT32 R_PointOnSide(fixed_t x, fixed_t y, node_t *restrict node)
-{
-	if (!node->dx)
-		return x <= node->x ? node->dy > 0 : node->dy < 0;
-
-	if (!node->dy)
-		return y <= node->y ? node->dx < 0 : node->dx > 0;
-
-	x -= node->x;
-	y -= node->y;
-
-	// Try to quickly decide by looking at sign bits.
-	// also use a mask to avoid branch prediction
-	INT32 mask = (node->dy ^ node->dx ^ x ^ y) >> 31;
-	return (mask & ((node->dy ^ x) < 0)) |  // (left is negative)
-		(~mask & (FixedMul(y, node->dx>>FRACBITS) >= FixedMul(node->dy>>FRACBITS, x)));
-}
 
 // killough 5/2/98: reformatted
 INT32 R_PointOnSegSide(fixed_t x, fixed_t y, seg_t *restrict line)
@@ -291,9 +268,8 @@ INT32 R_PointOnSegSide(fixed_t x, fixed_t y, seg_t *restrict line)
 	y -= ly;
 
 	// Try to quickly decide by looking at sign bits.
-	// also use a mask to avoid branch prediction
 	INT32 mask = (ldy ^ ldx ^ x ^ y) >> 31;
-	return (mask & ((ldy ^ x) < 0)) |  // (left is negative)
+	return (mask & ((ldy ^ x) < 0)) |	// (left is negative)
 		(~mask & (FixedMul(y, ldx>>FRACBITS) >= FixedMul(ldy>>FRACBITS, x)));
 }
 
@@ -712,18 +688,6 @@ void R_Init(void)
 	framecount = 0;
 }
 
-//
-// R_PointInSubsector
-//
-subsector_t *R_PointInSubsector(fixed_t x, fixed_t y)
-{
-	size_t nodenum = numnodes-1;
-
-	while (!(nodenum & NF_SUBSECTOR))
-		nodenum = nodes[nodenum].children[R_PointOnSide(x, y, nodes+nodenum)];
-
-	return &subsectors[nodenum & ~NF_SUBSECTOR];
-}
 
 //
 // R_IsPointInSubsector, same as above but returns 0 if not in subsector
@@ -762,14 +726,8 @@ subsector_t *R_IsPointInSubsector(fixed_t x, fixed_t y)
 //
 
 
-// WARNING: a should be unsigned but to add with 2048, it isn't!
-#define AIMINGTODY(a) ((FINETANGENT((2048+(((INT32)a)>>ANGLETOFINESHIFT)) & FINEMASK)*160)>>FRACBITS)
 
-// recalc necessary stuff for mouseaiming
-// slopes are already calculated for the full possible view (which is 4*viewheight).
-// 18/08/18: (No it's actually 16*viewheight, thanks Jimita for finding this out)
 
-#undef AIMINGTODY
 
 void R_SetupFrame(player_t *player, boolean skybox)
 {
@@ -1125,6 +1083,32 @@ void R_SkyboxFrame(player_t *player)
 
 }
 
+
+boolean R_IsViewpointThirdPerson(player_t *player, boolean skybox)
+{
+	boolean chasecam = false;
+	if (splitscreen && player == &players[secondarydisplayplayer] && player != &players[consoleplayer])
+		chasecam = (cv_chasecam2.value != 0);
+	else
+		chasecam = (cv_chasecam.value != 0);
+
+	if (player->climbing || (player->pflags & PF_NIGHTSMODE)  || player->playerstate == PST_DEAD || gamestate == GS_TITLESCREEN)
+		chasecam = true; // force chasecam on
+	else if (player->spectator) // no spectator chasecam
+		chasecam = false; // force chasecam off
+
+	// cut-away view stuff
+	if (player->awayviewtics || skybox)
+		return chasecam;
+	// use outside cam view
+	else if (!player->spectator && chasecam)
+		return true;
+
+	// use the player's eyes view
+	return false;
+}
+
+
 #define ANGLED_PORTALS
 
 static void R_PortalFrame(line_t *start, line_t *dest, portal_pair *portal)
@@ -1401,6 +1385,7 @@ void R_RegisterEngineStuff(void)
 	CV_RegisterVar(&cv_chasecam2);
 	CV_RegisterVar(&cv_shadow);
 	CV_RegisterVar(&cv_shadowoffs);
+	CV_RegisterVar(&cv_shadowposition);
 	CV_RegisterVar(&cv_skybox);
 
 	CV_RegisterVar(&cv_cam_dist);
@@ -1423,6 +1408,7 @@ void R_RegisterEngineStuff(void)
 	CV_RegisterVar(&cv_cam2_speed);
 	CV_RegisterVar(&cv_cam2_rotate);
 	CV_RegisterVar(&cv_cam2_rotspeed);
+	CV_RegisterVar(&cv_cam2_orbital);
 
 	CV_RegisterVar(&cv_showhud);
 	CV_RegisterVar(&cv_translucenthud);
@@ -1434,29 +1420,4 @@ void R_RegisterEngineStuff(void)
 	CV_RegisterVar(&cv_viewheight); 
 	// Uncapped
 	CV_RegisterVar(&cv_frameinterpolation);
-
-#ifdef HWRENDER
-	// GL-specific Commands
-	CV_RegisterVar(&cv_grgammablue);
-	CV_RegisterVar(&cv_grgammagreen);
-	CV_RegisterVar(&cv_grgammared);
-	CV_RegisterVar(&cv_grfovchange);
-	CV_RegisterVar(&cv_grfog);
-	CV_RegisterVar(&cv_grfogcolor);
-	CV_RegisterVar(&cv_grsoftwarefog);
-#ifdef ALAM_LIGHTING
-	CV_RegisterVar(&cv_grstaticlighting);
-	CV_RegisterVar(&cv_grdynamiclighting);
-	CV_RegisterVar(&cv_grcoronas);
-	CV_RegisterVar(&cv_grcoronasize);
-#endif
-	CV_RegisterVar(&cv_grmd2);
-	CV_RegisterVar(&cv_grspritebillboarding);
-	CV_RegisterVar(&cv_grskydome);
-#endif
-
-#ifdef HWRENDER
-	if (rendermode != render_soft && rendermode != render_none)
-		HWR_AddCommands();
-#endif
 }

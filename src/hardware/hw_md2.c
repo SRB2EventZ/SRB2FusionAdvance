@@ -465,7 +465,6 @@ void HWR_InitMD2(void)
 		md2_playermodels[s].grpatch = NULL;
 		md2_playermodels[s].skin = -1;
 		md2_playermodels[s].notfound = true;
-		md2_playermodels[s].error = false;
 	}
 	for (i = 0; i < NUMSPRITES; i++)
 	{
@@ -474,7 +473,6 @@ void HWR_InitMD2(void)
 		md2_models[i].grpatch = NULL;
 		md2_models[i].skin = -1;
 		md2_models[i].notfound = true;
-		md2_models[i].error = false;
 	}
 
 	// read the md2.dat file
@@ -893,7 +891,6 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 	INT32 nextFrame = -1;
 	FTransform p;
 	md2_t *md2;
-	UINT8 color[4];
 	interpmobjstate_t interp;
 
 	if (!cv_grmd2.value)
@@ -940,10 +937,8 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 				colormap = sector->extra_colormap;
 		}
 
-		if (colormap)
-			Surf.FlatColor.rgba = HWR_Lighting(lightlevel, colormap->rgba, colormap->fadergba, false, false);
-		else
-			Surf.FlatColor.rgba = HWR_Lighting(lightlevel, NORMALFOG, FADEFOG, false, false);
+		HWR_Lighting(&Surf, lightlevel, colormap);
+
 	}
 
 	// Look at HWR_ProjectSprite for more
@@ -962,11 +957,11 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 			//durs = tics;
 
 		if (spr->mobj->flags2 & MF2_SHADOW)
-			Surf.FlatColor.s.alpha = 0x40;
+			Surf.PolyColor.s.alpha = 0x40;
 		else if (spr->mobj->frame & FF_TRANSMASK)
 			HWR_TranstableToAlpha((spr->mobj->frame & FF_TRANSMASK)>>FF_TRANSSHIFT, &Surf);
 		else
-			Surf.FlatColor.s.alpha = 0xFF;
+			Surf.PolyColor.s.alpha = 0xFF;
 
 		// dont forget to enabled the depth test because we can't do this like
 		// before: polygons models are not sorted
@@ -981,8 +976,6 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 		else
 			md2 = &md2_models[spr->mobj->sprite];
 
-		if (md2->error)
-			return; // we already failed loading this before :(
 		if (!md2->model)
 		{
 			//CONS_Debug(DBG_RENDER, "Loading MD2... (%s)", sprnames[spr->mobj->sprite]);
@@ -997,7 +990,7 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 			else
 			{
 				//CONS_Debug(DBG_RENDER, " FAILED\n");
-				md2->error = true; // prevent endless fail
+				md2->notfound = true; // prevent endless fail
 				return;
 			}
 		}
@@ -1051,7 +1044,7 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 		frame = (spr->mobj->frame & FF_FRAMEMASK) % md2->model->meshes[0].numFrames;
 
 #ifdef USE_MODEL_NEXTFRAME
-		if (cv_grmd2.value == 1 && tics <= durs)
+		if ((cv_grmodelinterpolation.value == 1 && tics <= durs) || cv_grmodelinterpolation.value == 2 )
 		{
 			// frames are handled differently for states with FF_ANIMATE, so get the next frame differently for the interpolation
 			if (spr->mobj->frame & FF_ANIMATE)
@@ -1102,6 +1095,8 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 		}
 		p.anglex = 0.0f;
 #ifdef USE_FTRANSFORM_ANGLEZ
+        if(cv_grmodelrollangle.value)
+		{
 		// Slope rotation from Kart
 		p.anglez = 0.0f;
 		if (spr->mobj->standingslope)
@@ -1110,16 +1105,14 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 			fixed_t tempy = spr->mobj->standingslope->normal.y;
 			fixed_t tempx = spr->mobj->standingslope->normal.x;
 			fixed_t tempangle = AngleFixed(R_PointToAngle2(0, 0, FixedSqrt(FixedMul(tempy, tempy) + FixedMul(tempz, tempz)), tempx));
-			p.anglez = FIXED_TO_FLOAT(tempangle);
+			p.anglez = -FIXED_TO_FLOAT(tempangle);
 			tempangle = -AngleFixed(R_PointToAngle2(0, 0, tempz, tempy));
-			p.anglex = FIXED_TO_FLOAT(tempangle);
+			p.anglex = -FIXED_TO_FLOAT(tempangle);
+		}
 		}
 #endif
 
-		color[0] = Surf.FlatColor.s.red;
-		color[1] = Surf.FlatColor.s.green;
-		color[2] = Surf.FlatColor.s.blue;
-		color[3] = Surf.FlatColor.s.alpha;
+
 
 		// SRB2CBTODO: MD2 scaling support
 		finalscale *= FIXED_TO_FLOAT(spr->mobj->scale);
@@ -1128,8 +1121,8 @@ void HWR_DrawMD2(gr_vissprite_t *spr)
 #ifdef USE_FTRANSFORM_MIRROR
 		p.mirror = atransform.mirror; // from Kart
 #endif
-
-		HWD.pfnDrawModel(md2->model, frame, durs, tics, nextFrame, &p, finalscale, flip, color);
+	    HWD.pfnSetShader(SHADER_MODEL);	// model shader
+		HWD.pfnDrawModel(md2->model, frame, durs, tics, nextFrame, &p, finalscale, flip, &Surf);
 	}
 }
 

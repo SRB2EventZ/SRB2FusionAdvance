@@ -156,9 +156,13 @@ static  INT32   (*setupcontrols)[2];  // pointer to the gamecontrols of the play
 // shhh... what am I doing... nooooo!
 static INT32 vidm_testingmode = 0;
 static INT32 vidm_previousmode;
+static INT32 vidm_previousres[3];
 static INT32 vidm_selected = 0;
 static INT32 vidm_nummodes;
 static INT32 vidm_column_size;
+
+#define vidm_customreslength 12 // (XXXXXxYYYYY) - 11 plus the zero terminator
+static char vidm_customres[vidm_customreslength];
 
 //
 // PROTOTYPES
@@ -234,7 +238,6 @@ static menu_t SP_NightsAttackDef, SP_NightsReplayDef, SP_NightsGuestReplayDef, S
 #ifndef NONET
 static void M_StartServerMenu(INT32 choice);
 static void M_ConnectMenu(INT32 choice);
-static void M_ConnectIPMenu(INT32 choice);
 #endif
 static void M_StartSplitServerMenu(INT32 choice);
 static void M_StartServer(INT32 choice);
@@ -265,7 +268,7 @@ static void M_ChangeControl(INT32 choice);
 // Video & Sound
 menu_t OP_VideoOptionsDef, OP_VideoModeDef;
 #ifdef HWRENDER
-menu_t OP_OpenGLOptionsDef, OP_OpenGLFogDef, OP_OpenGLColorDef, OP_OpenGLLightingDef;
+menu_t OP_OpenGLOptionsDef, OP_OpenGLColorDef, OP_OpenGLLightingDef;
 #endif
 menu_t OP_SoundOptionsDef;
 menu_t OP_SoundAdvancedDef;
@@ -305,12 +308,11 @@ static void M_DrawControl(void);
 static void M_DrawVideoMode(void);
 static void M_DrawMonitorToggles(void);
 #ifdef HWRENDER
-static void M_OGL_DrawFogMenu(void);
 static void M_OGL_DrawColorMenu(void);
 #endif
 #ifndef NONET
 static void M_DrawConnectMenu(void);
-static void M_DrawConnectIPMenu(void);
+static void M_DrawMPMainMenu(void);
 static void M_DrawRoomMenu(void);
 #endif
 static void M_DrawJoystick(void);
@@ -332,9 +334,6 @@ static void M_HandleLevelStats(INT32 choice);
 static void M_HandleConnectIP(INT32 choice);
 #endif
 static void M_HandleSetupMultiPlayer(INT32 choice);
-#ifdef HWRENDER
-static void M_HandleFogColor(INT32 choice);
-#endif
 static void M_HandleVideoMode(INT32 choice);
 
 // Consvar onchange functions
@@ -342,6 +341,9 @@ static void Nextmap_OnChange(void);
 static void Newgametype_OnChange(void);
 static void Dummymares_OnChange(void);
 static void Textbox_OnChange(void);
+
+// IP Validity function
+static boolean M_CheckIfValidIPv4(const char *str);
 
 // ==========================================================================
 // CONSOLE VARIABLES AND THEIR POSSIBLE VALUES GO HERE.
@@ -404,7 +406,7 @@ static consvar_t cv_dummycontinues = {"dummycontinues", "0", CV_HIDEN, liveslimi
 static consvar_t cv_dummymares = {"dummymares", "Overall", CV_HIDEN|CV_CALL, dummymares_cons_t, Dummymares_OnChange, 0, NULL, NULL, 0, 0, NULL};
 
 static CV_PossibleValue_t textbox_cons_t[] = {{0, "Solid"}, {1, "GFZROCK"}, {0, NULL}};
-static consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_textboxstyle = {"textboxstyle", "Solid", CV_SAVE|CV_CALL, textbox_cons_t, Textbox_OnChange, 0, NULL, NULL, 0, 0, NULL};
 // ==========================================================================
 // ORGANIZATION START.
 // ==========================================================================
@@ -818,12 +820,12 @@ static menuitem_t MP_MainMenu[] =
 #ifndef NONET
 	{IT_CALL | IT_STRING, NULL, "HOST GAME",              M_StartServerMenu,      10},
 	{IT_CALL | IT_STRING, NULL, "JOIN GAME (Search)",	  M_ConnectMenu,		  30},
-	{IT_CALL | IT_STRING, NULL, "JOIN GAME (Specify IP)", M_ConnectIPMenu,        40},
+	{IT_KEYHANDLER | IT_STRING, NULL, "JOIN GAME (Specify IP)", M_HandleConnectIP,        40},
 #endif
-	{IT_CALL | IT_STRING, NULL, "TWO PLAYER GAME",        M_StartSplitServerMenu, 60},
+	{IT_CALL | IT_STRING, NULL, "TWO PLAYER GAME",        M_StartSplitServerMenu, 80},
 
-	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 1",         M_SetupMultiPlayer,     80},
-	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 2",         M_SetupMultiPlayer2,    90},
+	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 1",         M_SetupMultiPlayer,     100},
+	{IT_CALL | IT_STRING, NULL, "SETUP PLAYER 2",         M_SetupMultiPlayer2,    110},
 };
 
 static menuitem_t MP_ServerMenu[] =
@@ -900,11 +902,6 @@ static menuitem_t MP_RoomMenu[] =
 	{IT_DISABLED,         NULL, "",               M_ChooseRoom, 144},
 	{IT_DISABLED,         NULL, "",               M_ChooseRoom, 153},
 	{IT_DISABLED,         NULL, "",               M_ChooseRoom, 162},
-};
-
-static menuitem_t MP_ConnectIPMenu[] =
-{
-	{IT_KEYHANDLER | IT_STRING, NULL, "  IP Address:", M_HandleConnectIP, 0},
 };
 #endif
 
@@ -1144,26 +1141,29 @@ static menuitem_t OP_VideoOptionsMenu[] =
 {
 	{IT_STRING | IT_CALL,  NULL,   "Video Modes...",      M_VideoModeMenu,     10},
 
-#ifdef HWRENDER
-	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    20},
-#endif
+
 
 #if (defined (__unix__) && !defined (MSDOS)) || defined (UNIXCOMMON) || defined (HAVE_SDL)
-	{IT_STRING|IT_CVAR,      NULL, "Fullscreen",          &cv_fullscreen,    30},
+	{IT_STRING|IT_CVAR,      NULL, "Fullscreen",          &cv_fullscreen,    20},
 #endif
 
 	{IT_STRING | IT_CVAR | IT_CV_SLIDER,
-	                         NULL, "Brightness",          &cv_usegamma,      50},
-	{IT_STRING | IT_CVAR,    NULL, "Draw Distance",       &cv_drawdist, 60},
-	{IT_STRING | IT_CVAR,    NULL, "NiGHTS Draw Dist",    &cv_drawdist_nights, 70},
-	{IT_STRING | IT_CVAR,    NULL, "Precip Draw Dist",    &cv_drawdist_precip, 80},
-	{IT_STRING | IT_CVAR,    NULL, "Precip Density",      &cv_precipdensity, 90},
+	                         NULL, "Brightness",          &cv_usegamma,      35},
+	{IT_STRING | IT_CVAR,    NULL, "Draw Distance",       &cv_drawdist, 45},
+	{IT_STRING | IT_CVAR,    NULL, "NiGHTS Draw Dist",    &cv_drawdist_nights, 55},
+	{IT_STRING | IT_CVAR,    NULL, "Precip Draw Dist",    &cv_drawdist_precip, 65},
+	{IT_STRING | IT_CVAR,    NULL, "Precip Density",      &cv_precipdensity, 75},
 
-	{IT_STRING | IT_CVAR,    NULL, "Show FPS",            &cv_ticrate,    110},
-	{IT_STRING | IT_CVAR,    NULL, "Show TPS",            &cv_tpscounter,    120},
-	{IT_STRING | IT_CVAR,    NULL, "Clear Before Redraw", &cv_homremoval, 130},
-	{IT_STRING | IT_CVAR,    NULL, "Vertical Sync",       &cv_vidwait,    140},
-	{IT_STRING | IT_CVAR,    NULL, "Frame Interpolation",       &cv_frameinterpolation, 150},
+	{IT_STRING | IT_CVAR,    NULL, "Show FPS",            &cv_ticrate,    90},
+	{IT_STRING | IT_CVAR,    NULL, "Show TPS",            &cv_tpscounter,    100},
+	{IT_STRING | IT_CVAR,    NULL, "Clear Before Redraw", &cv_homremoval, 110},
+
+	{IT_STRING | IT_CVAR,    NULL, "Vertical Sync",       &cv_vidwait,    125},
+	{IT_STRING | IT_CVAR,    NULL, "Frame Interpolation",       &cv_frameinterpolation, 135},
+
+	#ifdef HWRENDER
+	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    150},
+	#endif
 };
 
 static menuitem_t OP_VideoModeMenu[] =
@@ -1175,22 +1175,26 @@ static menuitem_t OP_VideoModeMenu[] =
 static menuitem_t OP_OpenGLOptionsMenu[] =
 {
 	{IT_STRING|IT_CVAR,         NULL, "3D Models",    &cv_grmd2,      10},
-	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_grmodellighting,      20},
-	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_grfov,            30},
-	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        40},
-	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     50},
-	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,60},
-	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      70},
-	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      80},
-#ifdef _WINDOWS
-	{IT_STRING|IT_CVAR,         NULL, "Fullscreen",      &cv_fullscreen,       90},
-#endif
+	{IT_STRING|IT_CVAR,         NULL, "Model Interpolation",    &cv_grmodelinterpolation,      20},
+	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_grmodellighting,      30},
+	{IT_STRING|IT_CVAR,         NULL, "Model Rollangle",    &cv_grmodelrollangle,      40},
+
+	{IT_STRING|IT_CVAR,		NULL, "Shaders",					&cv_grshaders,				 60},
+	{IT_STRING|IT_CVAR,		NULL, "Lack of Perspective",		&cv_grshearing,				70},
+	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_grfov,            90},
+	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        100},
+	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     110},
+	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,120},
+	{IT_STRING|IT_CVAR,         NULL, "Sky Dome",    &cv_grskydome,      140},
+	{IT_STRING|IT_CVAR,         NULL, "OpenGL Loading Screen",    &cv_glloadingscreen,      150},
 
 #ifdef ALAM_LIGHTING
-	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     100},
+	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",     &OP_OpenGLLightingDef,     170},
+	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        180},
+#else
+	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        170},
 #endif
-	{IT_SUBMENU|IT_STRING,      NULL, "Fog...",          &OP_OpenGLFogDef,          110},
-	{IT_SUBMENU|IT_STRING,      NULL, "Gamma...",        &OP_OpenGLColorDef,        120},
+	
 };
 
 #ifdef ALAM_LIGHTING
@@ -1203,13 +1207,6 @@ static menuitem_t OP_OpenGLLightingMenu[] =
 };
 #endif
 
-static menuitem_t OP_OpenGLFogMenu[] =
-{
-	{IT_STRING|IT_CVAR,       NULL, "Fog",         &cv_grfog,        10},
-	{IT_STRING|IT_KEYHANDLER, NULL, "Fog color",   M_HandleFogColor, 20},
-	{IT_STRING|IT_CVAR,       NULL, "Fog density", &cv_grfogdensity, 30},
-	{IT_STRING|IT_CVAR,       NULL, "Software Fog",&cv_grsoftwarefog,40},
-};
 
 static menuitem_t OP_OpenGLColorMenu[] =
 {
@@ -1270,35 +1267,37 @@ static menuitem_t OP_DataOptionsMenu[] =
 
 static menuitem_t OP_ScreenshotOptionsMenu[] =
 {
-	{IT_STRING|IT_CVAR, NULL, "Storage Location", &cv_screenshot_option, 10},
-	{IT_STRING|IT_CVAR|IT_CV_STRING, NULL, "Custom Folder", &cv_screenshot_folder, 20},
+	{IT_HEADER, NULL, "Screenshots (F8)", NULL, 5},
+	{IT_STRING|IT_CVAR, NULL, "Storage Location",  &cv_screenshot_option,          15},
+	{IT_STRING|IT_CVAR|IT_CV_STRING, NULL, "Custom Folder", &cv_screenshot_folder, 25},
+	{IT_STRING|IT_CVAR, NULL, "Memory Level",      &cv_zlib_memory,                55},
+	{IT_STRING|IT_CVAR, NULL, "Compression Level", &cv_zlib_level,                 65},
+	{IT_STRING|IT_CVAR, NULL, "Strategy",          &cv_zlib_strategy,              75},
+	{IT_STRING|IT_CVAR, NULL, "Window Size",       &cv_zlib_window_bits,           85},
 
-	{IT_HEADER, NULL, "Screenshots (F8)", NULL, 50},
-	{IT_STRING|IT_CVAR, NULL, "Memory Level",      &cv_zlib_memory,      60},
-	{IT_STRING|IT_CVAR, NULL, "Compression Level", &cv_zlib_level,       70},
-	{IT_STRING|IT_CVAR, NULL, "Strategy",          &cv_zlib_strategy,    80},
-	{IT_STRING|IT_CVAR, NULL, "Window Size",       &cv_zlib_window_bits, 90},
+	{IT_HEADER, NULL, "Movie Mode (F9)", NULL, 100},
+	{IT_STRING|IT_CVAR, NULL, "Storage Location",  &cv_movie_option,              110},
+	{IT_STRING|IT_CVAR|IT_CV_STRING, NULL, "Custom Folder", &cv_movie_folder, 	  120},
+	{IT_STRING|IT_CVAR, NULL, "Capture Mode",      &cv_moviemode,                 150},
 
-	{IT_HEADER, NULL, "Movie Mode (F9)", NULL, 105},
-	{IT_STRING|IT_CVAR, NULL, "Capture Mode", &cv_moviemode, 115},
+	{IT_STRING|IT_CVAR, NULL, "Region Optimizing", &cv_gif_optimize,              160},
+	{IT_STRING|IT_CVAR, NULL, "Downscaling",       &cv_gif_downscale,             170},
 
-	{IT_STRING|IT_CVAR, NULL, "Region Optimizing", &cv_gif_optimize,  125},
-	{IT_STRING|IT_CVAR, NULL, "Downscaling",       &cv_gif_downscale, 135},
-
-	{IT_STRING|IT_CVAR, NULL, "Memory Level",      &cv_zlib_memorya,      125},
-	{IT_STRING|IT_CVAR, NULL, "Compression Level", &cv_zlib_levela,       135},
-	{IT_STRING|IT_CVAR, NULL, "Strategy",          &cv_zlib_strategya,    145},
-	{IT_STRING|IT_CVAR, NULL, "Window Size",       &cv_zlib_window_bitsa, 155},
+	{IT_STRING|IT_CVAR, NULL, "Memory Level",      &cv_zlib_memorya,              160},
+	{IT_STRING|IT_CVAR, NULL, "Compression Level", &cv_zlib_levela,               170},
+	{IT_STRING|IT_CVAR, NULL, "Strategy",          &cv_zlib_strategya,            180},
+	{IT_STRING|IT_CVAR, NULL, "Window Size",       &cv_zlib_window_bitsa,         190},
 };
 
 enum
 {
-	op_screenshot_folder = 1,
-	op_screenshot_capture = 8,
-	op_screenshot_gif_start = 9,
-	op_screenshot_gif_end = 10,
-	op_screenshot_apng_start = 11,
-	op_screenshot_apng_end = 14,
+	op_screenshot_folder = 2,
+	op_movie_folder = 9,
+	op_screenshot_capture = 10,
+	op_screenshot_gif_start = 11,
+	op_screenshot_gif_end = 12,
+	op_screenshot_apng_start = 13,
+	op_screenshot_apng_end = 16,
 };
 
 static menuitem_t OP_EraseDataMenu[] =
@@ -1681,7 +1680,17 @@ menu_t SP_PlayerDef =
 };
 
 // Multiplayer
-menu_t MP_MainDef = DEFAULTMENUSTYLE("M_MULTI", MP_MainMenu, &MainDef, 60, 40);
+menu_t MP_MainDef =
+{
+	"M_MULTI",
+	sizeof (MP_MainMenu)/sizeof (menuitem_t),
+	&MainDef,
+	MP_MainMenu,
+	M_DrawMPMainMenu,
+	60, 45,
+	0,
+	M_CancelConnect
+};
 menu_t MP_ServerDef = MAPICONMENUSTYLE("M_MULTI", MP_ServerMenu, &MP_MainDef);
 #ifndef NONET
 menu_t MP_ConnectDef =
@@ -1692,17 +1701,6 @@ menu_t MP_ConnectDef =
 	MP_ConnectMenu,
 	M_DrawConnectMenu,
 	27,24,
-	0,
-	M_CancelConnect
-};
-menu_t MP_ConnectIPDef =
-{
-	"M_MULTI",
-	sizeof (MP_ConnectIPMenu)/sizeof (menuitem_t),
-	&MP_MainDef,
-	MP_ConnectIPMenu,
-	M_DrawConnectIPMenu,
-	27,40,
 	0,
 	M_CancelConnect
 };
@@ -1791,17 +1789,6 @@ menu_t OP_OpenGLOptionsDef = DEFAULTMENUSTYLE("M_VIDEO", OP_OpenGLOptionsMenu, &
 #ifdef ALAM_LIGHTING
 menu_t OP_OpenGLLightingDef = DEFAULTMENUSTYLE("M_VIDEO", OP_OpenGLLightingMenu, &OP_OpenGLOptionsDef, 60, 40);
 #endif
-menu_t OP_OpenGLFogDef =
-{
-	"M_VIDEO",
-	sizeof (OP_OpenGLFogMenu)/sizeof (menuitem_t),
-	&OP_OpenGLOptionsDef,
-	OP_OpenGLFogMenu,
-	M_OGL_DrawFogMenu,
-	60, 40,
-	0,
-	NULL
-};
 menu_t OP_OpenGLColorDef =
 {
 	"M_VIDEO",
@@ -2047,6 +2034,12 @@ void Addons_option_Onchange(void)
 {
 	OP_AddonsOptionsMenu[op_addons_folder].status =
 		(cv_addons_option.value == 3 ? IT_CVAR|IT_STRING|IT_CV_STRING : IT_DISABLED);
+}
+
+void Moviemode_option_Onchange(void)
+{
+	OP_ScreenshotOptionsMenu[op_movie_folder].status =
+		(cv_movie_option.value == 3 ? IT_CVAR|IT_STRING|IT_CV_STRING : IT_DISABLED);
 }
 
 static void Textbox_OnChange(void)
@@ -2840,7 +2833,17 @@ void M_Ticker(void)
 	{
 		// restore the previous video mode
 		if (--vidm_testingmode == 0)
-			setmodeneeded = vidm_previousmode + 1;
+		{
+			if (vidm_previousres[2])
+			{
+				setresneeded[0] = vidm_previousres[0];
+				setresneeded[1] = vidm_previousres[1];
+				setresneeded[2] = 2;
+			}
+			else
+				setmodeneeded = vidm_previousmode + 1;
+		}
+
 	}
 }
 
@@ -2894,7 +2897,7 @@ void M_Init(void)
 #ifdef HWRENDER
 	// Permanently hide some options based on render mode
 	if (rendermode == render_soft)
-		OP_VideoOptionsMenu[1].status = IT_DISABLED;
+		OP_VideoOptionsMenu[12].status = IT_DISABLED;
 #endif
 
 #ifndef NONET
@@ -7042,32 +7045,42 @@ static void M_StartServerMenu(INT32 choice)
 // CONNECT VIA IP
 // ==============
 
-static char setupm_ip[16];
-
-// Connect using IP address Tails 11-19-2002
-static void M_ConnectIPMenu(INT32 choice)
-{
-	(void)choice;
-	// modified game check: no longer handled
-	// we don't request a restart unless the filelist differs
-
-	M_SetupNextMenu(&MP_ConnectIPDef);
-}
+static char setupm_ip[128];
 
 // Draw the funky Connect IP menu. Tails 11-19-2002
 // So much work for such a little thing!
-static void M_DrawConnectIPMenu(void)
+static void M_DrawMPMainMenu(void)
 {
 	// use generic drawer for cursor, items and title
 	M_DrawGenericMenu();
 
 	// draw name string
-	V_DrawString(128,40, V_MONOSPACE, setupm_ip);
+	M_DrawTextBox(55,90,22,1);
 
-	// draw text cursor for name
-	if (itemOn == 0 &&
-	    skullAnimCounter < 4)   //blink cursor
-		V_DrawCharacter(128+V_StringWidth(setupm_ip, V_MONOSPACE),40,'_',false);
+	if ( strlen(setupm_ip) > 21 ) { // Is setupm_ip larger than the textbox can fit?
+
+		char left_arrow[1+1] = "\x1C"; // Left arrow
+
+		char new_setupm_ip[21]; // Last 21 characters of setupm_ip
+		strcat(new_setupm_ip, setupm_ip+(strlen(setupm_ip)-21));
+
+		if (itemOn == 2)
+			V_DrawThinString(53 + (skullAnimCounter % 8) / 4,98, V_ALLOWLOWERCASE|V_MONOSPACE|V_YELLOWMAP, left_arrow); // Draw the left arrow
+
+		V_DrawString(65,98, V_ALLOWLOWERCASE|V_MONOSPACE, new_setupm_ip); // Draw the truncated setupm_ip.
+	 
+	 	// draw text cursor for name
+		if (itemOn == 2 &&
+		    skullAnimCounter < 4)   //blink cursor
+			V_DrawCharacter(65+V_StringWidth(new_setupm_ip, V_ALLOWLOWERCASE|V_MONOSPACE),98,'_',false);
+	} else {
+		V_DrawString(65,98, V_ALLOWLOWERCASE|V_MONOSPACE, setupm_ip);
+
+		// draw text cursor for name
+		if (itemOn == 2 &&
+		    skullAnimCounter < 4)   //blink cursor
+			V_DrawCharacter(65+V_StringWidth(setupm_ip, V_ALLOWLOWERCASE|V_MONOSPACE),98,'_',false);
+	}
 }
 
 // Tails 11-19-2002
@@ -7075,12 +7088,37 @@ static void M_ConnectIP(INT32 choice)
 {
 	(void)choice;
 
-	if (*setupm_ip == 0)
+	M_ClearMenus(true);
+
+	if (*setupm_ip == 0) // Length 0
 	{
 		M_StartMessage("You must specify an IP address.\n", NULL, MM_NOTHING);
 		return;
 	}
 
+	if (!M_CheckIfValidIPv4(setupm_ip) && strstr(setupm_ip, ":") == NULL) // Not IPv4 and no colons
+	{
+		int i = 0;
+		while (setupm_ip[i]) // For each char in setupm_ip
+		{
+			// Is it an alphabet letter or brackets?
+			if (isalpha(setupm_ip[i]) || setupm_ip[i] == 91 || setupm_ip[i] == 93) {
+				break; // It's probably valid
+			} else { // Otherwise
+				// It's invalid
+				M_StartMessage("You must specify a valid IP address.\n", NULL, MM_NOTHING);
+				return;
+			}
+			i++;
+		}
+	}
+
+	if (setupm_ip[(strlen(setupm_ip)-1)] == 58) { // If there is a colon at the end of the char
+		M_StartMessage("Please specify a valid port.\n", NULL, MM_NOTHING);
+		return;
+	}
+
+	// Checks passed, attempt connection!
 	COM_BufAddText(va("connect \"%s\"\n", setupm_ip));
 
 	// A little "please wait" message.
@@ -7092,17 +7130,70 @@ static void M_ConnectIP(INT32 choice)
 		I_FinishUpdate(); // page flip or blit buffer
 }
 
+static boolean M_CheckIfValidIPv4(const char *str)
+{
+    int segs = 0;   // Segment count.
+    int chcnt = 0;  // Character count within segment.
+    int accum = 0;  // Accumulator for segment.
+    // Catch NULL pointer.
+    if (str == NULL)
+        return false;
+    // Process every character in string.
+    while (*str != '\0') {
+        // Segment changeover.
+        if (*str == '.') {
+            // Must have some digits in segment.
+            if (chcnt == 0)
+                return false;
+            // Limit number of segments.
+            if (++segs == 4)
+                return false;
+            // Reset segment values and restart loop.
+            chcnt = accum = 0;
+            str++;
+            continue;
+        }
+        // Check numeric.
+        if ((*str < '0') || (*str > '9'))
+            return false;
+        // Accumulate and check segment.
+        if ((accum = accum * 10 + *str - '0') > 255)
+            return false;
+        // Advance other segment specific stuff and continue loop.
+        chcnt++;
+        str++;
+    }
+    // Check enough segments and enough characters in last segment.
+    if (segs != 3)
+        return false;
+    if (chcnt == 0)
+        return false;
+    // Address okay.
+    return true;
+}
+
 // Tails 11-19-2002
+
 static void M_HandleConnectIP(INT32 choice)
 {
-	size_t   l;
-	boolean  exitmenu = false;  // exit to previous menu and send name change
+	size_t l;
+	boolean exitmenu = false;  // exit to previous menu and send name change
 
 	switch (choice)
 	{
+		case KEY_DOWNARROW:
+			M_NextOpt();
+			S_StartSound(NULL,sfx_menu1); // Tails
+			break;
+
+		case KEY_UPARROW:
+			M_PrevOpt();
+			S_StartSound(NULL,sfx_menu1); // Tails
+			break;
+
 		case KEY_ENTER:
 			S_StartSound(NULL,sfx_menu1); // Tails
-			M_ClearMenus(true);
+			currentMenu->lastOn = itemOn;
 			M_ConnectIP(1);
 			break;
 
@@ -7111,29 +7202,68 @@ static void M_HandleConnectIP(INT32 choice)
 			break;
 
 		case KEY_BACKSPACE:
-			if ((l = strlen(setupm_ip))!=0 && itemOn == 0)
+			skullAnimCounter = 4; // For a nice looking cursor
+			if ((l = strlen(setupm_ip)) != 0)
 			{
-				S_StartSound(NULL,sfx_menu1); // Tails
-				setupm_ip[l-1] =0;
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[l-1] = 0;
+			}
+			break;
+
+		case KEY_DEL:
+			skullAnimCounter = 4; // For a nice looking cursor
+			if (setupm_ip[0])
+			{
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[0] = 0;
 			}
 			break;
 
 		default:
+			skullAnimCounter = 4; // For a nice looking cursor
+
 			l = strlen(setupm_ip);
-			if (l < 16-1 && (choice == 46 || (choice >= 48 && choice <= 57))) // Rudimentary number and period enforcing
-			{
-				S_StartSound(NULL,sfx_menu1); // Tails
-				setupm_ip[l] =(char)choice;
-				setupm_ip[l+1] =0;
+			if (l >= 127)
+				break;
+
+			const char *paste = I_ClipboardPaste(); // Paste clipboard into char
+
+			if ( ctrldown ) {
+				switch (choice) {
+					case 118: // ctrl+v, pasting
+						if (paste != NULL)
+							strcat(setupm_ip, paste); // Concat the ip field with clipboard
+						setupm_ip[127] = 0; // Truncate to maximum length
+						break;
+					case 99: // ctrl+c, copying
+						I_ClipboardCopy(setupm_ip, l);
+						break;
+					case 120: // ctrl+x, cutting
+						I_ClipboardCopy(setupm_ip, l);
+						setupm_ip[0] = 0;
+						break;
+					default: // otherwise do nothing
+						break;
+				}
+				break; // break
 			}
-			else if (l < 16-1 && choice >= 199 && choice <= 211 && choice != 202 && choice != 206) //numpad too!
+			
+			// Rudimentary number, letter, period, and colon enforcing
+			if (choice == 46 || choice == 91 || choice == 93 || (choice >= 65 && choice <= 90 ) || (choice >= 97 && choice <= 122 ) || (choice >= 48 && choice <= 58))
 			{
-				XBOXSTATIC char keypad_translation[] = {'7','8','9','-','4','5','6','+','1','2','3','0','.'};
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[l] = (char)choice;
+				setupm_ip[l+1] = 0;
+			}
+			else if (choice >= 199 && choice <= 211 && choice != 202 && choice != 206) //numpad too!
+			{
+				char keypad_translation[] = {'7','8','9','-','4','5','6','+','1','2','3','0','.'};
 				choice = keypad_translation[choice - 199];
-				S_StartSound(NULL,sfx_menu1); // Tails
-				setupm_ip[l] =(char)choice;
-				setupm_ip[l+1] =0;
+				//S_StartSound(NULL,sfx_menu1); // Tails
+				setupm_ip[l] = (char)choice;
+				setupm_ip[l+1] = 0;
 			}
+
 			break;
 	}
 
@@ -7510,7 +7640,7 @@ static void M_DrawJoystick(void)
 			compareval = cv_usejoystick.value;
 #else
 		compareval2 = cv_usejoystick2.value;
-		compareval = cv_usejoystick.value
+		compareval = cv_usejoystick.value;
 #endif
 
 		if ((setupcontrols_secondaryplayer && (i == compareval2))
@@ -7905,11 +8035,12 @@ static void M_ChangeControl(INT32 choice)
 #define MAXCOLUMNMODES   12     //max modes displayed in one column
 #define MAXMODEDESCS     (MAXCOLUMNMODES*3)
 
-static modedesc_t modedescs[MAXMODEDESCS];
+static modedesc_t modedescs[MAXMODEDESCS+1];
 
 static void M_VideoModeMenu(INT32 choice)
 {
 	INT32 i, j, vdup, nummodes, width, height;
+	boolean modefound = false;
 	const char *desc;
 
 	(void)choice;
@@ -7953,7 +8084,10 @@ static void M_VideoModeMenu(INT32 choice)
 						vdup = 1;
 
 						if (i == vid.modenum)
+						{
 							vidm_selected = j;
+							modefound = true;
+						}
 					}
 					else
 						vdup = 1;
@@ -7968,7 +8102,10 @@ static void M_VideoModeMenu(INT32 choice)
 				modedescs[vidm_nummodes].desc = desc;
 
 				if (i == vid.modenum)
+				{
 					vidm_selected = vidm_nummodes;
+					modefound = true;
+				}
 
 				// Pull out the width and height
 				sscanf(desc, "%u%*c%u", &width, &height);
@@ -7983,6 +8120,16 @@ static void M_VideoModeMenu(INT32 choice)
 	}
 
 	vidm_column_size = (vidm_nummodes+2) / 3;
+
+	// add the custom video mode entry
+	modedescs[vidm_nummodes].modenum = -1;
+	vidm_nummodes++;
+
+	if (!modefound)
+		vidm_selected = vidm_nummodes-1;
+
+	if (strlen(vidm_customres) == 0)
+		strlcpy(vidm_customres, va("%dx%d", vid.width, vid.height), vidm_customreslength);
 
 	M_SetupNextMenu(&OP_VideoModeDef);
 }
@@ -8002,6 +8149,15 @@ static void M_DrawVideoMode(void)
 	col = OP_VideoModeDef.y + 14;
 	for (i = 0; i < vidm_nummodes; i++)
 	{
+
+		// custom video mode
+		if (modedescs[i].modenum == -1)
+		{
+			V_DrawString(19, OP_VideoModeDef.y+76,V_YELLOWMAP, "Custom Resolution");
+			V_DrawFill(19, OP_VideoModeDef.y + 92, (vidm_customreslength*8)+4, 8+6, 239);
+			V_DrawString(22, OP_VideoModeDef.y + 95, V_ALLOWLOWERCASE|V_MONOSPACE, vidm_customres);
+			continue;
+		}
 		if (i == vidm_selected)
 			V_DrawString(row, col, V_YELLOWMAP, modedescs[i].desc);
 		// Show multiples of 320x200 as green.
@@ -8051,6 +8207,14 @@ static void M_DrawVideoMode(void)
 			V_YELLOWMAP, "Use at own risk.");
 	}
 
+	if (modedescs[vidm_selected].modenum == -1)
+	{
+		if (skullAnimCounter < 4 && !vidm_testingmode)
+			V_DrawCharacter(22 + V_StringWidth(vidm_customres, V_ALLOWLOWERCASE|V_MONOSPACE), OP_VideoModeDef.y + 95,
+				'_' | 0x80, false);
+		return;
+	}
+
 	// Draw the cursor for the VidMode menu
 	i = 41 - 10 + ((vidm_selected / vidm_column_size)*7*13);
 	j = OP_VideoModeDef.y + 14 + ((vidm_selected % vidm_column_size)*8);
@@ -8062,11 +8226,19 @@ static void M_DrawVideoMode(void)
 // special menuitem key handler for video mode list
 static void M_HandleVideoMode(INT32 ch)
 {
+	size_t l;
 	if (vidm_testingmode > 0) switch (ch)
 	{
 		// change back to the previous mode quickly
 		case KEY_ESCAPE:
-			setmodeneeded = vidm_previousmode + 1;
+			if (vidm_previousres[2])
+			{
+				setresneeded[0] = vidm_previousres[0];
+				setresneeded[1] = vidm_previousres[1];
+				setresneeded[2] = 2;
+			}
+			else
+				setmodeneeded = vidm_previousmode + 1;
 			vidm_testingmode = 0;
 			break;
 
@@ -8109,12 +8281,35 @@ static void M_HandleVideoMode(INT32 ch)
 
 		case KEY_ENTER:
 			S_StartSound(NULL, sfx_menu1);
-			if (vid.modenum == modedescs[vidm_selected].modenum)
+						// custom res
+			if (modedescs[vidm_selected].modenum == -1)
+			{
+				// Pull out the width and height
+				INT32 width = vid.width, height = vid.height;
+				 if (strlen(vidm_customres) < 1)
+					break;
+				sscanf(vidm_customres, "%u%*c%u", &width, &height);
+
+				vidm_previousres[0] = vid.width;
+				vidm_previousres[1] = vid.height;
+				vidm_previousres[2] = 1;
+				vidm_testingmode = 15*TICRATE;
+
+				// in case the previous setmode was not finished
+				if (!setresneeded[2])
+				{
+					setresneeded[0] = width;
+					setresneeded[1] = height;
+					setresneeded[2] = 2;
+				}
+			}
+			else if (vid.modenum == modedescs[vidm_selected].modenum)
 				SCR_SetDefaultMode();
 			else
 			{
 				vidm_testingmode = 15*TICRATE;
 				vidm_previousmode = vid.modenum;
+				vidm_previousres[2] = 0;
 				if (!setmodeneeded) // in case the previous setmode was not finished
 					setmodeneeded = modedescs[vidm_selected].modenum + 1;
 			}
@@ -8126,8 +8321,51 @@ static void M_HandleVideoMode(INT32 ch)
 			else
 				M_ClearMenus(true);
 			break;
+		// custom video mode
+		case KEY_BACKSPACE:
+			if (modedescs[vidm_selected].modenum != -1)
+				break;
+
+			if ((l = strlen(vidm_customres)) != 0)
+			{
+				S_StartSound(NULL,sfx_menu1); // Tails
+				vidm_customres[l-1] = 0;
+			}
+			break;
+
+		case KEY_DEL:
+			if (modedescs[vidm_selected].modenum != -1)
+				break;
+
+			if (vidm_customres[0])
+			{
+				S_StartSound(NULL,sfx_menu1); // Tails
+				vidm_customres[0] = 0;
+			}
+			break;
 
 		default:
+			if (modedescs[vidm_selected].modenum != -1)
+				break;
+
+			l = strlen(vidm_customres);
+			if (l >= vidm_customreslength-1)
+				break;
+
+			if ((ch == 'x' || ch == 'X') || (ch >= '0' && ch <= '9'))
+			{
+				S_StartSound(NULL,sfx_menu1); // Tails
+				vidm_customres[l] = (char)ch;
+				vidm_customres[l+1] = 0;
+			}
+			else if (ch >= 199 && ch <= 211 && ch != 202 && ch != 206) //numpad too!
+			{
+				char keypad_translation[] = {'7','8','9','-','4','5','6','+','1','2','3','0','.'};
+				ch = keypad_translation[ch - 199];
+				S_StartSound(NULL,sfx_menu1); // Tails
+				vidm_customres[l] = (char)ch;
+				vidm_customres[l+1] = 0;
+			}
 			break;
 	}
 }
@@ -8231,25 +8469,6 @@ static void M_QuitSRB2(INT32 choice)
 // OpenGL specific options
 // =====================================================================
 
-#define FOG_COLOR_ITEM  1
-// ===================
-// M_OGL_DrawFogMenu()
-// ===================
-static void M_OGL_DrawFogMenu(void)
-{
-	INT32 mx, my;
-
-	mx = currentMenu->x;
-	my = currentMenu->y;
-	M_DrawGenericMenu(); // use generic drawer for cursor, items and title
-	V_DrawString(BASEVIDWIDTH - mx - V_StringWidth(cv_grfogcolor.string, 0),
-		my + currentMenu->menuitems[FOG_COLOR_ITEM].alphaKey, V_YELLOWMAP, cv_grfogcolor.string);
-	// blink cursor on FOG_COLOR_ITEM if selected
-	if (itemOn == FOG_COLOR_ITEM && skullAnimCounter < 4)
-		V_DrawCharacter(BASEVIDWIDTH - mx,
-			my + currentMenu->menuitems[FOG_COLOR_ITEM].alphaKey, '_' | 0x80,false);
-}
-
 // =====================
 // M_OGL_DrawColorMenu()
 // =====================
@@ -8264,61 +8483,4 @@ static void M_OGL_DrawColorMenu(void)
 		V_YELLOWMAP, "Gamma correction");
 }
 
-//===================
-// M_HandleFogColor()
-//===================
-static void M_HandleFogColor(INT32 choice)
-{
-	size_t i, l;
-	char temp[8];
-	boolean exitmenu = false; // exit to previous menu and send name change
-
-	switch (choice)
-	{
-		case KEY_DOWNARROW:
-			S_StartSound(NULL, sfx_menu1);
-			itemOn++;
-			break;
-
-		case KEY_UPARROW:
-			S_StartSound(NULL, sfx_menu1);
-			itemOn--;
-			break;
-
-		case KEY_ESCAPE:
-			S_StartSound(NULL, sfx_menu1);
-			exitmenu = true;
-			break;
-
-		case KEY_BACKSPACE:
-			S_StartSound(NULL, sfx_menu1);
-			strcpy(temp, cv_grfogcolor.string);
-			strcpy(cv_grfogcolor.zstring, "000000");
-			l = strlen(temp)-1;
-			for (i = 0; i < l; i++)
-				cv_grfogcolor.zstring[i + 6 - l] = temp[i];
-			break;
-
-		default:
-			if ((choice >= '0' && choice <= '9') || (choice >= 'a' && choice <= 'f')
-				|| (choice >= 'A' && choice <= 'F'))
-			{
-				S_StartSound(NULL, sfx_menu1);
-				strcpy(temp, cv_grfogcolor.string);
-				strcpy(cv_grfogcolor.zstring, "000000");
-				l = strlen(temp);
-				for (i = 0; i < l; i++)
-					cv_grfogcolor.zstring[5 - i] = temp[l - i];
-				cv_grfogcolor.zstring[5] = (char)choice;
-			}
-			break;
-	}
-	if (exitmenu)
-	{
-		if (currentMenu->prevMenu)
-			M_SetupNextMenu(currentMenu->prevMenu);
-		else
-			M_ClearMenus(true);
-	}
-}
 #endif
