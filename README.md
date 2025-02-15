@@ -27,6 +27,11 @@ This build is maintained by members of the [Super SRB2 Games Z community](https:
 
     So OpenGL doesn't suck AS bad
     ![srb20266](https://github.com/user-attachments/assets/3ab23525-41ad-411f-9388-b3a0726bb63e)
+
+* ## Input Display
+  Display that shows your inputs, available globally with the cvar `showinput`
+![srb20026](https://github.com/user-attachments/assets/094aab8f-0745-4ec2-bbda-8b4ec466aa69)
+
    
 * ## Orbital Camera
 
