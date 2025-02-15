@@ -8130,7 +8130,7 @@ static void M_VideoModeMenu(INT32 choice)
 		vidm_selected = vidm_nummodes-1;
 
 	if (strlen(vidm_customres) == 0)
-		strncpy(vidm_customres, va("%dx%d", vid.width, vid.height), vidm_customreslength);
+		strlcpy(vidm_customres, va("%dx%d", vid.width, vid.height), vidm_customreslength);
 
 	M_SetupNextMenu(&OP_VideoModeDef);
 }
