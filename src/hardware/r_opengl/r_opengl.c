@@ -31,6 +31,7 @@
 #include <math.h>
 #include "r_opengl.h"
 #include "r_vbo.h"
+#include "r_vbo.h"
 
 #if defined (HWRENDER) && !defined (NOROPENGL)
 
