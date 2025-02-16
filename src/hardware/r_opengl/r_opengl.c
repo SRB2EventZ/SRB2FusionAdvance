@@ -94,8 +94,7 @@ static GLfloat    modelMatrix[16];
 static GLfloat    projMatrix[16];
 static GLint       viewport[4];
 
-
- 
+  
 // Sryder:	NextTexAvail is broken for these because palette changes or changes to the texture filter or antialiasing
 //			flush all of the stored textures, leaving them unavailable at times such as between levels
 //			These need to start at 0 and be set to their number, and be reset to 0 when deleted so that intel GPUs
@@ -1743,7 +1742,6 @@ EXPORT void HWRAPI(SetTexture) (FTextureInfo *pTexInfo)
 		w = pTexInfo->width;
 		h = pTexInfo->height;
 
-
 		if ((pTexInfo->grInfo.format == GR_TEXFMT_P_8) ||
 			(pTexInfo->grInfo.format == GR_TEXFMT_AP_88))
 		{
@@ -2903,7 +2901,6 @@ EXPORT INT32  HWRAPI(GetTextureUsed) (void)
 	}
 	return res;
 }
-
 
 
 EXPORT void HWRAPI(PostImgRedraw) (float points[SCREENVERTS][SCREENVERTS][2])

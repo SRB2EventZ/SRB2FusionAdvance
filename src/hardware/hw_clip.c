@@ -79,6 +79,8 @@
 #ifdef HAVE_SPHEREFRUSTRUM
 static GLfloat viewMatrix[16];
 static GLfloat projMatrix[16];
+static GLfloat viewMatrix[16];
+static GLfloat projMatrix[16];
 float frustum[6][4];
 #endif
 
