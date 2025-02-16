@@ -6998,7 +6998,7 @@ static void P_MovePlayer(player_t *player)
 	}
 
 #ifdef HWRENDER
-	if (rendermode != render_soft && rendermode != render_none && cv_grfovchange.value)
+	if (rendermode != render_soft && rendermode != render_none && cv_fovchange.value)
 	{
 		fixed_t speed;
 		const fixed_t runnyspeed = 20*FRACUNIT;
@@ -8066,13 +8066,6 @@ boolean P_MoveChaseCamera(player_t *player, camera_t *thiscam, boolean resetcall
 	else
 	{
 		dist = camdist;
-
-		// x1.5 dist for splitscreen
-		if (splitscreen)
-		{
-			dist = FixedMul(dist, 3*FRACUNIT/2);
-			camheight = FixedMul(camheight, 3*FRACUNIT/2);
-		}
 
 		// x1.2 dist for analog
 		if (P_AnalogMove(player))
