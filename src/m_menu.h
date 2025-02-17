@@ -170,6 +170,9 @@ typedef struct menu_s
 void M_SetupNextMenu(menu_t *menudef);
 void M_ClearMenus(boolean callexitmenufunc);
 
+// Maybe this goes here????? Who knows.
+boolean M_MouseNeeded(void);
+
 extern menu_t *currentMenu;
 
 extern menu_t MainDef;
@@ -248,6 +251,18 @@ void Moviemode_option_Onchange(void);
 	prev,\
 	source,\
 	M_DrawGenericMenu,\
+	x, y,\
+	0,\
+	NULL\
+}
+
+#define DEFAULTSCROLLMENUSTYLE(header, source, prev, x, y)\
+{\
+	header,\
+	sizeof(source)/sizeof(menuitem_t),\
+	prev,\
+	source,\
+	M_DrawGenericScrollMenu,\
 	x, y,\
 	0,\
 	NULL\
