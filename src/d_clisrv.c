@@ -17,6 +17,7 @@
 #include <unistd.h> //for unlink
 #endif
 
+#include "i_time.h"
 #include "i_net.h"
 #include "i_system.h"
 #include "i_video.h"
@@ -117,6 +118,12 @@ static UINT8 resynch_inprogress[MAXNETNODES];
 static UINT8 resynch_local_inprogress = false; // WE are desynched and getting packets to fix it.
 static UINT8 player_joining = false;
 UINT8 hu_resynching = 0;
+
+
+
+
+// true when a player is connecting or disconnecting so that the gameplay has stopped in its tracks
+boolean hu_stopped = false;
 
 UINT8 adminpassmd5[16];
 boolean adminpasswordset = false;
@@ -2005,7 +2012,10 @@ static boolean CL_ServerConnectionTicker(boolean viams, const char *tmpsave, tic
 #endif
 	}
 	else
-		I_Sleep();
+	{
+		I_Sleep(cv_sleep.value);
+		I_UpdateTime(cv_timescale.value);
+	}
 
 	return true;
 }
@@ -4627,8 +4637,11 @@ static void SV_Maketic(void)
 	maketic++;
 }
 
-void TryRunTics(tic_t realtics)
+
+boolean TryRunTics(tic_t realtics)
 {
+	boolean ticking;
+
 	// the machine has lagged but it is not so bad
 	if (realtics > TICRATE/7) // FIXME: consistency failure!!
 	{
@@ -4652,7 +4665,7 @@ void TryRunTics(tic_t realtics)
 
 	if (demoplayback)
 	{
-		neededtic = gametic + (realtics * cv_playbackspeed.value);
+		neededtic = gametic + realtics;
 		// start a game after a demo
 		maketic += realtics;
 		firstticstosend = maketic;
@@ -4672,10 +4685,23 @@ void TryRunTics(tic_t realtics)
 	}
 #endif
 
-	if (player_joining)
-		return;
+	ticking = neededtic > gametic;
 
-	if (neededtic > gametic)
+	if (ticking)
+	{
+		if (realtics)
+			hu_stopped = false;
+	}
+
+	if (player_joining)
+	{
+		if (realtics)
+			hu_stopped = true;
+		return false;
+	}
+
+
+	if (ticking)
 	{
 		if (advancedemo)
 			D_StartTitle();
@@ -4692,6 +4718,12 @@ void TryRunTics(tic_t realtics)
 				consistancy[gametic%BACKUPTICS] = Consistancy();
 			}
 	}
+	else
+	{
+		if (realtics)
+			hu_stopped = true;
+	}
+	return ticking;
 }
 
 #ifdef NEWPING

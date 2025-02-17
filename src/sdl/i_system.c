@@ -161,6 +161,7 @@ static char returnWadPath[256];
 
 #include "../doomdef.h"
 #include "../m_misc.h"
+#include "../i_time.h"
 #include "../i_video.h"
 #include "../i_sound.h"
 #include "../i_system.h"
@@ -187,6 +188,13 @@ static char returnWadPath[256];
 #include "../d_clisrv.h"
 #include "../byteptr.h"
 #endif
+
+// A little more than the minimum sleep duration on Windows.
+// May be incorrect for other platforms, but we don't currently have a way to
+// query the scheduler granularity. SDL will do what's needed to make this as
+// low as possible though.
+#define MIN_SLEEP_DURATION_MS 2.1
+
 
 /**	\brief	The JoyReset function
 
@@ -2038,64 +2046,141 @@ ticcmd_t *I_BaseTiccmd2(void)
 
 
 static Uint64 timer_frequency;
-static Uint64 tic_epoch;
-static double tic_frequency;
-static Uint64 basetime = 0;
-tic_t I_GetTime (void)
-{
-	static double elapsed;
-
-	const Uint64 now = SDL_GetPerformanceCounter();
-	elapsed += (now - tic_epoch) / tic_frequency;
-	tic_epoch = now; // moving epoch
-
-	return (tic_t)elapsed;
-}
 
 precise_t I_GetPreciseTime(void)
 {
 	return SDL_GetPerformanceCounter();
 }
 
-int I_PreciseToMicros(precise_t d)
-{
-	return (int)(d / (timer_frequency / 1000000.0));
-}
-Uint64 I_GetPrecisePrecision(void)
+
+
+UINT64 I_GetPrecisePrecision(void)
 {
 	return SDL_GetPerformanceFrequency();
 }
 
-fixed_t I_GetTimeFrac (void)
+
+
+static UINT32 frame_rate;
+
+static double frame_frequency;
+static UINT64 frame_epoch;
+static double elapsed_frames;
+
+static void I_InitFrameTime(const UINT64 now, const UINT32 cap)
 {
-	Uint64 ticks;
-	Uint64 prevticks;
-	fixed_t frac;
+	frame_rate = cap;
+	frame_epoch = now;
 
-	ticks = SDL_GetTicks() - basetime;
-	//if (ticks > tics * 1000 / TICRATE) return 1 * FRACUNIT;
-	prevticks = prev_tics * 1000 / TICRATE;
+	//elapsed_frames = 0.0;
 
-	frac = FixedDiv((ticks - prevticks) * FRACUNIT, (int)lroundf((1.f/TICRATE)*1000 * FRACUNIT));
-	return frac > FRACUNIT ? FRACUNIT : frac;
+	if (frame_rate == 0)
+	{
+		// Shouldn't be used, but just in case...?
+		frame_frequency = 1.0;
+		return;
+	}
+
+	frame_frequency = timer_frequency / (double)frame_rate;
 }
+
+double I_GetFrameTime(void)
+{
+	const UINT64 now = SDL_GetPerformanceCounter();
+	const UINT32 cap = R_GetFramerateCap();
+
+	if (cap != frame_rate)
+	{
+		I_InitFrameTime(now, cap);
+	}
+
+	if (frame_rate == 0)
+	{
+		// Always advance a frame.
+		elapsed_frames += 1.0;
+	}
+	else
+	{
+		elapsed_frames += (now - frame_epoch) / frame_frequency;
+	}
+
+	frame_epoch = now; // moving epoch
+	return elapsed_frames;
+}
+
 //
 //I_StartupTimer
 //
 void I_StartupTimer(void)
 {
 	timer_frequency = SDL_GetPerformanceFrequency();
-	tic_epoch       = SDL_GetPerformanceCounter();
-	tic_frequency   = timer_frequency / (double)NEWTICRATE;
+
+	I_InitFrameTime(0, R_GetFramerateCap());
+	elapsed_frames  = 0.0;
 }
 
-
-
-void I_Sleep(void)
+void I_Sleep(UINT32 ms)
 {
-	if (cv_sleep.value != -1)
-		SDL_Delay(cv_sleep.value);
+	SDL_Delay(ms);
 }
+
+
+void I_SleepDuration(precise_t duration)
+{
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__HAIKU__)
+	UINT64 precision = I_GetPrecisePrecision();
+	precise_t dest = I_GetPreciseTime() + duration;
+	precise_t slack = (precision / 5000); // 0.2 ms slack
+	if (duration > slack)
+	{
+		duration -= slack;
+		struct timespec ts = {
+			.tv_sec = duration / precision,
+			.tv_nsec = duration * 1000000000 / precision % 1000000000,
+		};
+		int status;
+		do status = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, &ts);
+		while (status == EINTR);
+	}
+
+	// busy-wait the rest
+	while (((INT64)dest - (INT64)I_GetPreciseTime()) > 0);
+#elif defined (MIN_SLEEP_DURATION_MS)
+	UINT64 precision = I_GetPrecisePrecision();
+	INT32 sleepvalue = cv_sleep.value;
+	UINT64 delaygranularity;
+	precise_t cur;
+	precise_t dest;
+
+	{
+		double gran = round(((double)(precision / 1000) * sleepvalue * MIN_SLEEP_DURATION_MS));
+		delaygranularity = (UINT64)gran;
+	}
+
+	cur = I_GetPreciseTime();
+	dest = cur + duration;
+
+	// the reason this is not dest > cur is because the precise counter may wrap
+	// two's complement arithmetic is our friend here, though!
+	// e.g. cur 0xFFFFFFFFFFFFFFFE = -2, dest 0x0000000000000001 = 1
+	// 0x0000000000000001 - 0xFFFFFFFFFFFFFFFE = 3
+	while ((INT64)(dest - cur) > 0)
+	{
+		// If our cv_sleep value exceeds the remaining sleep duration, use the
+		// hard sleep function.
+		if (sleepvalue > 0 && (dest - cur) > delaygranularity)
+		{
+			I_Sleep(sleepvalue);
+		}
+
+		// Otherwise, this is a spinloop.
+
+		cur = I_GetPreciseTime();
+	}
+#endif
+}
+
+
 
 INT32 I_StartupSystem(void)
 {

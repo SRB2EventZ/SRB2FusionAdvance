@@ -42,28 +42,39 @@ extern UINT8 keyboard_started;
 */
 size_t I_GetFreeMem(size_t *total);
 
-/**	\brief  Called by D_SRB2Loop, returns current time in tics.
-*/
-tic_t I_GetTime(void); 
 
-/** \brief  Get the current time as a fraction of a tic since the last tic.
+/**	\brief	Returns precise time value for performance measurement. The precise
+            time should be a monotonically increasing counter, and will wrap.
+			precise_t is internally represented as an unsigned integer and
+			integer arithmetic may be used directly between values of precise_t.
 */
-fixed_t I_GetTimeFrac(void);
-
-/**	\brief	Returns precise time value for performance measurement.
-  */
 precise_t I_GetPreciseTime(void);
+
+
+/** \brief  Get the precision of precise_t in units per second. Invocations of
+            this function for the program's duration MUST return the same value.
+  */
+UINT64 I_GetPrecisePrecision(void);
+
 
 /**	\brief	Returns the difference between precise times as microseconds.
   */
 int I_PreciseToMicros(precise_t);
 
-
-/**	\brief	The I_Sleep function
-
-	\return	void
+/** \brief  Get the current time in rendering tics, including fractions.
 */
-void I_Sleep(void);
+double I_GetFrameTime(void);
+
+
+/**	\brief	Sleeps for the given duration in milliseconds. Depending on the
+            operating system's scheduler, the calling thread may give up its
+			time slice for a longer duration. The implementation should give a
+			best effort to sleep for the given duration, without spin-locking.
+			Calling code should check the current precise time after sleeping
+			and not assume the thread has slept for the expected duration.
+*/
+void I_Sleep(UINT32 ms);
+
 
 /**	\brief Get events
 
