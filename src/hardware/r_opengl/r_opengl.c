@@ -83,7 +83,6 @@ static GLboolean MipMap = GL_FALSE;
 static GLint min_filter = GL_LINEAR;
 static GLint mag_filter = GL_LINEAR;
 static GLint anisotropic_filter = 0;
-static FTransform  md2_transform;
 boolean supportMipMap = false;
 static boolean model_lighting = false;
 
