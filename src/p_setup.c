@@ -3187,9 +3187,12 @@ boolean P_SetupLevel(boolean skipprecip)
 #endif
 	}
 
-	R_ResetViewInterpolation(0);
-	R_ResetViewInterpolation(0);
-	R_UpdateMobjInterpolators();
+	if (rendermode != render_none)
+	{
+		R_ResetViewInterpolation(0);
+		R_ResetViewInterpolation(0);
+		R_UpdateMobjInterpolators();
+	}
 	
 	return true;
 }
