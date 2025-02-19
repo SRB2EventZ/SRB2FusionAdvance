@@ -1183,7 +1183,7 @@ static menuitem_t OP_OpenGLOptionsMenu[] =
 
 	{IT_STRING|IT_CVAR,		NULL, "Shaders",					&cv_grshaders,				 60},
 	{IT_STRING|IT_CVAR,		NULL, "Lack of Perspective",		&cv_grshearing,				70},
-	{IT_STRING|IT_CVAR|IT_CV_SLIDER,         NULL, "Field of view",   &cv_fov,            90},
+	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_fov,            90},
 	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        100},
 	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     110},
 	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,120},
@@ -2074,31 +2074,21 @@ static void M_UpdateItemOn(void)
 static void M_ChangeCvar(INT32 choice)
 {
 	consvar_t *cv = (consvar_t *)currentMenu->menuitems[itemOn].itemaction;
-	char s[20];
-
-	// yea
-	choice = (choice*2-1);
 
 	if (((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_SLIDER)
 	    ||((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_INVISSLIDER)
 	    ||((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_NOMOD))
 	{
-		if ((cv->flags & CV_FLOAT) && (currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_SLIDER)
-		{
-			float adjust = choice * ((cv == &cv_fov) ? 0.5f : (1.0f/16.0f)); // :)
-			sprintf(s,"%f",FIXED_TO_FLOAT(cv->value)+adjust);
-			CV_Set(cv,s);
-		}
-		else
-			CV_SetValue(cv,cv->value+choice);
+		CV_SetValue(cv,cv->value+(choice*2-1));
 	}
 	else if (cv->flags & CV_FLOAT)
 	{
-		sprintf(s,"%f",FIXED_TO_FLOAT(cv->value)+choice*(1.0f/16.0f));
+		char s[20];
+		sprintf(s,"%f",FIXED_TO_FLOAT(cv->value)+(choice*2-1)*(1.0f/16.0f));
 		CV_Set(cv,s);
 	}
 	else
-		CV_AddValue(cv,choice);
+		CV_AddValue(cv,choice*2-1);
 }
 
 static boolean M_ChangeStringCvar(INT32 choice)
@@ -2575,12 +2565,6 @@ boolean M_Responder(event_t *ev)
 				// detach any keys associated with the game control
 				G_ClearControlKeys(setupcontrols, currentMenu->menuitems[itemOn].alphaKey);
 				return true;
-			}
-			else if ((currentMenu->menuitems[itemOn].status & IT_TYPE) == IT_CVAR)
-			{
-				consvar_t *cv = (consvar_t *)currentMenu->menuitems[itemOn].itemaction;
-				if ((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_SLIDER)
-					CV_Set(cv, cv->defaultvalue);
 			}
 			// Why _does_ backspace go back anyway?
 			//currentMenu->lastOn = itemOn;
