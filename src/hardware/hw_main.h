@@ -93,6 +93,7 @@ extern consvar_t cv_grcoronas;
 extern consvar_t cv_grcoronasize;
 #endif
 extern consvar_t cv_grshaders;
+extern consvar_t cv_grfov;
 extern consvar_t cv_grmd2;
 extern consvar_t cv_grmodelinterpolation;
 extern consvar_t cv_grgammared;
@@ -101,7 +102,7 @@ extern consvar_t cv_grgammablue;
 extern consvar_t cv_grfiltermode;
 extern consvar_t cv_granisotropicmode;
 extern consvar_t cv_grcorrecttricks;
-extern consvar_t cv_fovchange;
+extern consvar_t cv_grfovchange;
 extern consvar_t cv_grsolvetjoin;
 extern consvar_t cv_grshearing;
 extern consvar_t cv_grspritebillboarding;
