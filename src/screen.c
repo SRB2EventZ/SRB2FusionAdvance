@@ -184,6 +184,7 @@ void SCR_Startup(void)
 	V_Init();
 	CV_RegisterVar(&cv_ticrate);
 	CV_RegisterVar(&cv_tpscounter);
+	CV_RegisterVar(&cv_thinfps);
 	CV_RegisterVar(&cv_constextsize);
 
 	V_SetPalette(0);
@@ -407,6 +408,8 @@ void SCR_DisplayTicRate(void)
 	tic_t totaltics = 0;
 	INT32 ticcntcolor = 0;
 	INT32 width;
+	void (*stringfunc) (INT32, INT32, INT32, const char *);
+	INT32 (*stringwidthfunc)(const char *, INT32);
 
 	if (gamestate == GS_NULL)
 		return;
@@ -434,11 +437,14 @@ void SCR_DisplayTicRate(void)
 	if (totaltics <= TICRATE/2) ticcntcolor = V_REDMAP;
 	else if (totaltics == TICRATE) ticcntcolor = V_SKYMAP;
 
+	stringfunc = (cv_thinfps.value) ? V_DrawThinString : V_DrawString;
+	stringwidthfunc = (cv_thinfps.value) ?  V_ThinStringWidth : V_StringWidth;
+	
 	if (cv_ticrate.value == 2) // compact counter
 	{
-		width = vid.dupx*V_StringWidth(va("%04.2f", averageFPS), V_NOSCALESTART); //this used to be a monstrosity
+		width = vid.dupx*stringwidthfunc(va("%04.2f", averageFPS), V_NOSCALESTART); //this used to be a monstrosity
 
-		V_DrawString(vid.width-width, h,
+		stringfunc(vid.width-width, h,
 			fpscntcolor|V_NOSCALESTART, va("%04.2f", averageFPS)); // use averageFPS directly
 	}
 	else if (cv_ticrate.value == 1) // full counter
@@ -451,23 +457,29 @@ void SCR_DisplayTicRate(void)
 		else
 			drawnstr = va("%4.2f", averageFPS);
 		
-		width = vid.dupx*V_StringWidth(drawnstr, V_NOSCALESTART); //same here
+		width = vid.dupx*stringwidthfunc(drawnstr, V_NOSCALESTART); //same here
 
-		V_DrawString((vid.width - 92 * vid.dupx + V_StringWidth("FPS: ", V_NOSCALESTART)), h,
+		stringfunc(vid.width - ((7 * 8 * vid.dupx) + (vid.dupx*stringwidthfunc("FPS: ", V_NOSCALESTART))), h,
 			V_YELLOWMAP|V_NOSCALESTART, "FPS:");
-		V_DrawString(vid.width - width, h,
+		stringfunc(vid.width - width, h,
 				fpscntcolor|V_NOSCALESTART, drawnstr);	
 		
 	}
 
 	if (cv_tpscounter.value == 2) // compact counter
-		V_DrawString(vid.width-(16*vid.dupx), h-(8*vid.dupy),
+	{
+		width = vid.dupx*stringwidthfunc(va("%02d", totaltics), V_NOSCALESTART);
+
+		stringfunc(vid.width-width, h-(8*vid.dupy),
 			ticcntcolor|V_NOSCALESTART, va("%02d", totaltics));
+	}
 	else if (cv_tpscounter.value == 1) // full counter
 	{
-		V_DrawString((vid.width - 92 * vid.dupx + V_StringWidth("TPS: ", V_NOSCALESTART)), h-(8*vid.dupy),
+		width = vid.dupx*stringwidthfunc(va("%02d/%02u", totaltics, TICRATE), V_NOSCALESTART);
+		
+		stringfunc(vid.width - ((7 * 8 * vid.dupx) + (vid.dupx*stringwidthfunc("TPS: ", V_NOSCALESTART))), h-(8*vid.dupy),
 			V_YELLOWMAP|V_NOSCALESTART, "TPS:");
-		V_DrawString(vid.width-(40*vid.dupx), h-(8*vid.dupy),
+		stringfunc(vid.width-width, h-(8*vid.dupy),
 			ticcntcolor|V_NOSCALESTART, va("%02d/%02u", totaltics, TICRATE));
 	}
 		lasttic = ontic;
