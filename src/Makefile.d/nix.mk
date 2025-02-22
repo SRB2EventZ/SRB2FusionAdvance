@@ -3,9 +3,9 @@
 #
 
 ifeq (${DEDICATED},1)
-EXENAME?=lsrb2dlegacy
+EXENAME?=lsrb2fa
 else
-EXENAME?=lsdl2srb2legacy
+EXENAME?=lsdl2srb2fa
 endif
 
 opts+=-DUNIXCOMMON -DLUA_USE_POSIX

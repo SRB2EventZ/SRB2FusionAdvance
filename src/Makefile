@@ -208,7 +208,7 @@ bin:=../bin
 endif
 
 # default EXENAME (usually set by platform)
-EXENAME?=srb2legacy
+EXENAME?=srb2fa
 DBGNAME?=$(EXENAME).debug
 
 exe:=$(bin)/$(EXENAME)
