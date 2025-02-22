@@ -156,8 +156,8 @@ extern FILE *logstream;
 #define VERSION    201 // Game version
 #define SUBVERSION 27  // more precise version number
 #define SUBVERSION_NETCOMPAT 25  // for backwards compatibility with 2.1.25 servers
-#define VERSIONSTRING "Fusion Advance v2.1.27"
-#define VERSIONSTRINGW L"Fusion Advance v2.1.27"
+#define VERSIONSTRING "Fusion Advance v2.1.27 1.0"
+#define VERSIONSTRINGW L"Fusion Advance v2.1.27 1.0"
 // Hey! If you change this, add 1 to the MODVERSION below!
 // Otherwise we can't force updates!
 #endif
