@@ -2,7 +2,7 @@
 
 Fusion Advance is a custom build of Sonic Robo Blast 2, Version 2.1.25, forked from P-AS's [srb2-legacy build](https://github.com/P-AS/srb2-legacy), which is an attempt at an unofficial patch of Version 2.1, continuing where v2.1.25 left off, including essential fixes and QOL improvements seen in Version 2.2.
 
-# Major Features
+# Features 
 * Everything from srb2-legacy
 * Uncapped framerate, allows you to play at framerates up to 300
 * OpenGL Shaders which allow OpenGL to look *much* better
@@ -11,7 +11,6 @@ Fusion Advance is a custom build of Sonic Robo Blast 2, Version 2.1.25, forked f
 * Orbital Camera, camera orbits around player instead of panning
 * OpenGL sprite clipping has been (mostly) fixed
 * Few code optimizations here and there
-# Other Features 
 * SRB2Kart style video and OpenGL menus
 * OpenGL shadows can rotate around camera, enable with `shadowposition`
 * Legacy textboxes from 2.0 and before(**Broken In OpenGL at the moment**)
