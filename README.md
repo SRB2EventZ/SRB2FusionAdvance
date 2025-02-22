@@ -18,6 +18,7 @@ Fusion Advance is a custom build of Sonic Robo Blast 2, Version 2.1.25, forked f
 * Thin FPS available with `thinfps`
 * Slope rotation(3d models only)
 * Software perspective in OpenGL
+* *NEW* chat colors taken from SRB2Kart
 
 
   ...and many more coming soon!
