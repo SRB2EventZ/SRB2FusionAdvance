@@ -722,11 +722,6 @@ subsector_t *R_IsPointInSubsector(fixed_t x, fixed_t y)
 //
 // R_SetupFrame
 //
-
-
-
-
-
 void R_SetupFrame(player_t *player, boolean skybox)
 {
 	camera_t *thiscam;
@@ -829,7 +824,7 @@ void R_SetupFrame(player_t *player, boolean skybox)
 		if (thiscam->subsector)
 			newview->sector = thiscam->subsector->sector;
 		else
-			newview->sector = R_PointInSubsector(viewx, viewy)->sector;
+			newview->sector = R_PointInSubsector(newview->x, newview->y)->sector;
 	}
 	else
 	{
@@ -841,11 +836,11 @@ void R_SetupFrame(player_t *player, boolean skybox)
 		if (r_viewmobj->subsector)
 			newview->sector = r_viewmobj->subsector->sector;
 		else
-			newview->sector = R_PointInSubsector(viewx, viewy)->sector;
+			newview->sector = R_PointInSubsector(newview->x, newview->y)->sector;
 	}
 
 	//newview->sin = FINESINE(viewangle>>ANGLETOFINESHIFT);
-	//viewcos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
+	//newview->cos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
 
 	R_InterpolateView(player, false, R_UsingFrameInterpolation() ? rendertimefrac : FRACUNIT);
 }
@@ -970,7 +965,6 @@ void R_SkyboxFrame(player_t *player)
 					angle_t ang = r_viewmobj->angle>>ANGLETOFINESHIFT;
 					newview->x += FixedMul(x,FINECOSINE(ang)) - FixedMul(y,  FINESINE(ang));
 					newview->y += FixedMul(x,  FINESINE(ang)) + FixedMul(y,FINECOSINE(ang));
-
 				}
 			}
 			if (mh->skybox_scalez > 0)
@@ -1081,10 +1075,10 @@ void R_SkyboxFrame(player_t *player)
 	if (r_viewmobj->subsector)
 		newview->sector = r_viewmobj->subsector->sector;
 	else
-		newview->sector = R_PointInSubsector(viewx, viewy)->sector;
+		newview->sector = R_PointInSubsector(newview->x, newview->y)->sector;
 
-	//viewsin = FINESINE(viewangle>>ANGLETOFINESHIFT);
-	//viewcos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
+	//newview->sin = FINESINE(viewangle>>ANGLETOFINESHIFT);
+	//newview->cos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
 
 	R_InterpolateView(player, true, R_UsingFrameInterpolation() ? rendertimefrac : FRACUNIT);
 
