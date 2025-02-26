@@ -403,10 +403,6 @@ void SCR_DisplayTicRate(void)
 	const INT32 h = vid.height-(8*vid.dupy);
 	UINT32 cap = R_GetFramerateCap();
 	double fps = round(averageFPS);
-	INT32 fpscntcolor = 0;
-	const INT32 h = vid.height-(8*vid.dupy);
-	UINT32 cap = R_GetFramerateCap();
-	double fps = round(averageFPS);
 	tic_t i;
 	tic_t ontic = I_GetTime();
 	tic_t totaltics = 0;
