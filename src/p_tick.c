@@ -26,6 +26,8 @@
 #include "m_cheat.h"
 #include "r_main.h"
 #include "i_video.h" // rendermode
+#include "r_main.h"
+#include "i_video.h" // rendermode
 
 tic_t leveltime;
 

@@ -1501,7 +1501,6 @@ INT32 VID_SetMode(INT32 modeNum)
 	}
 	//Impl_SetWindowName("SRB2 "VERSIONSTRING);
 
-
 	src_rect.w = vid.width;
 	src_rect.h = vid.height;
 

@@ -18,6 +18,7 @@
 #endif
 
 #include "i_time.h"
+#include "i_time.h"
 #include "i_net.h"
 #include "i_system.h"
 #include "i_video.h"
@@ -4711,7 +4712,6 @@ boolean TryRunTics(tic_t realtics)
 			{
 				DEBFILE(va("============ Running tic %d (local %d)\n", gametic, localgametic)); 
 
-				prev_tics = I_GetTime();
 				G_Ticker((gametic % NEWTICRATERATIO) == 0);
 				ExtraDataTicker();
 				gametic++;

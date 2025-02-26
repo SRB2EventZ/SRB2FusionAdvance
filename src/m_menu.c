@@ -27,6 +27,7 @@
 #include "g_game.h"
 #include "g_input.h"
 #include "i_time.h"
+#include "i_time.h"
 #include "m_argv.h"
 
 // Data.

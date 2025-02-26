@@ -51,6 +51,7 @@ int	snprintf(char *str, size_t n, const char *fmt, ...);
 #include "i_sound.h"
 #include "i_system.h"
 #include "i_time.h"
+#include "i_time.h"
 #include "i_video.h"
 #include "i_threads.h"
 #include "m_argv.h"
