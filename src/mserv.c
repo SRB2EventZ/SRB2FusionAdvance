@@ -132,6 +132,7 @@
 #define SEND_VERSION_MSG        	214
 #define GET_BANNED_MSG          	215 // Someone's been baaaaaad!
 #define PING_SERVER_MSG         	216
+#define GET_EXT_SERVER_MSG      	217
 
 #define HEADER_SIZE (sizeof (INT32)*4)
 
@@ -423,7 +424,7 @@ const msg_server_t *GetShortServersList(INT32 room)
 		return NULL;
 	}
 
-	msg.type = GET_SHORT_SERVER_MSG;
+	msg.type = GET_EXT_SERVER_MSG;
 	msg.length = 0;
 	msg.room = room;
 	if (MS_Write(fd, &msg) < 0)
@@ -659,7 +660,6 @@ static void AddToMasterServer(void *userdata)
 	msg_t msg;
 	msg_server_t *info = (msg_server_t *)msg.buffer;
 	INT32 room = -1;
-	time_t timestamp = time(NULL);
 	UINT32 signature, tmp;
 	const char *insname;
 
@@ -667,7 +667,6 @@ static void AddToMasterServer(void *userdata)
 	if (fd == ERRSOCKET)
 	{
 		CONS_Alert(CONS_ERROR, M_GetText("Master Server socket error #%u: %s\n"), errno, strerror(errno));
-		MSLastPing = timestamp;
 		ConnectionFailed();
 		return;
 	}
@@ -679,7 +678,6 @@ static void AddToMasterServer(void *userdata)
 	if (i) // it was bad
 	{
 		CONS_Alert(CONS_ERROR, M_GetText("Master Server socket error #%u: %s\n"), errno, strerror(errno));
-		MSLastPing = timestamp;
 		CloseConnection(fd);
 		ConnectionFailed();
 		return;
@@ -717,7 +715,6 @@ static void AddToMasterServer(void *userdata)
 	msg.room = 0;
 	if (MS_Write(fd, &msg) < 0)
 	{
-		MSLastPing = timestamp;
 		CloseConnection(fd);
 		ConnectionFailed();
 		return;
@@ -726,7 +723,6 @@ static void AddToMasterServer(void *userdata)
 	if(*state != MSCS_REGISTERED)
 		CONS_Printf(M_GetText("Master Server update successful.\n"));
 
-	MSLastPing = timestamp;
 	*state = MSCS_REGISTERED;
 	CloseConnection(fd);
 #ifdef HAVE_IPV6
@@ -838,14 +834,17 @@ void MSCloseUDPSocket(void)
 
 static inline void SendPingToMasterServer(void)
 {
+	time_t timestamp = time(NULL);
+
 	// Here, have a simpler MS Ping... - Cue
-	if(time(NULL) > (MSLastPing+(60*2)) && con_state != MSCS_NONE)
+	if(timestamp > (MSLastPing+(60*2)) && con_state != MSCS_NONE)
 	{
 #ifdef HAVE_THREADS
 		I_SpawnThread("ms_register", AddToMasterServer, NULL);
 #else
 		AddToMasterServer(NULL);
 #endif
+		MSLastPing = timestamp;
 	}
 }
 

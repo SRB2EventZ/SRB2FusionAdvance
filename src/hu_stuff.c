@@ -2122,7 +2122,7 @@ void HU_Drawer(void)
 	{
 		char resynch_text[14];
 		UINT32 i;
-		
+
 		strcpy(resynch_text, "Resynching");
 		for (i = 0; i < (resynch_ticker / 16) % 4; i++)
 			strcat(resynch_text, ".");
@@ -3116,4 +3116,3 @@ void HU_DoCEcho(const char *msg)
 	cechotext[sizeof(cechotext) - 1] = '\0';
 	cechotimer = cechoduration;
 }
-
