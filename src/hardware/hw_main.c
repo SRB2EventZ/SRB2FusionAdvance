@@ -25,6 +25,7 @@
 #include "hw_light.h"
 #include "hw_drv.h"
 #include "hw_batching.h"
+#include "hw_batching.h"
 
 #include "../i_video.h" // for rendermode == render_glide
 #include "../v_video.h"
@@ -39,7 +40,7 @@
 #include "../g_game.h"
 #include "../st_stuff.h"
 #include "../i_system.h"
-#include "../m_cheat.h" 
+#include "../m_cheat.h"
 #include "../d_main.h"
 #ifdef ESLOPE
 #include "../p_slopes.h"
@@ -1251,9 +1252,9 @@ static void HWR_ProcessSeg(void) // Sort of like GLWall::Process in GZDoom
 	wallVerts[2].x = wallVerts[1].x = ve.x;
 	wallVerts[2].z = wallVerts[1].z = ve.y;
 
-	// x offset the texture	
+	// x offset the texture
 	{
-		
+
 		fixed_t texturehpeg = gr_sidedef->textureoffset + gr_curline->offset;
 		cliplow = (float)texturehpeg;
 		cliphigh = (float)(texturehpeg + (gr_curline->flength*FRACUNIT));
@@ -2025,10 +2026,8 @@ static void HWR_ProcessSeg(void) // Sort of like GLWall::Process in GZDoom
 
 					blendmode = PF_Fog|PF_NoTexture;
 
-									
 					lightnum = HWR_CalcWallLight(rover->master->frontsector->lightlevel, vs.x, vs.y, ve.x, ve.y);
 					colormap = rover->master->frontsector->extra_colormap;
-
 
 					Surf.PolyColor.s.alpha = HWR_FogBlockAlpha(rover->master->frontsector->lightlevel, rover->master->frontsector->extra_colormap);
 
@@ -3109,7 +3108,6 @@ static void HWR_RenderPolyObjectPlane(polyobj_t *polysector, boolean isceiling, 
 	else
 		blendmode |= PF_Masked|PF_Modulated|PF_Clip;
 
-	
 	HWR_ProcessPolygon(&Surf, planeVerts, nrPlaneVerts, blendmode, SHADER_FLOOR, false); // floor shader
 }
 
@@ -3473,7 +3471,7 @@ static void HWR_Subsector(size_t num)
 
 					light = R_GetPlaneLight(gr_frontsector, centerHeight, dup_viewz < cullHeight ? true : false);
 					alpha = HWR_FogBlockAlpha(*gr_frontsector->lightlist[light].lightlevel, rover->master->frontsector->extra_colormap);
-				
+
 
 
 					HWR_AddTransparentFloor(0,
@@ -3853,7 +3851,7 @@ static void HWR_DrawSpriteShadow(gr_vissprite_t *spr, GLPatch_t *gpatch, float t
 	R_GetShadowZ(spr->mobj, &floorslope);
 
 
-    
+
     interpmobjstate_t interp = {0};
 
 	if (R_UsingFrameInterpolation())
@@ -4059,7 +4057,7 @@ static void HWR_DrawSpriteShadow(gr_vissprite_t *spr, GLPatch_t *gpatch, float t
 	{
 		sSurf.PolyColor.s.alpha = (UINT8)(sSurf.PolyColor.s.alpha - floorheight/4);
 		HWR_ProcessPolygon(&sSurf, swallVerts, 4, PF_Translucent|PF_Modulated|PF_Clip, SHADER_FLOOR, false); // floor shader
-	} 
+	}
 }
 
 // This is expecting a pointer to an array containing 4 wallVerts for a sprite
@@ -4067,7 +4065,7 @@ static void HWR_RotateSpritePolyToAim(gr_vissprite_t *spr, FOutVector *wallVerts
 {
 	if (cv_grspritebillboarding.value && spr && spr->mobj && wallVerts)
 	{
-		
+
 		// uncapped/interpolation
 		interpmobjstate_t interp = {0};
 
@@ -4415,7 +4413,7 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 	wallVerts[2].y = wallVerts[3].y = top;
 	wallVerts[0].y = wallVerts[1].y = bot;
 #endif
-	
+
 	HWR_Lighting(&Surf, lightlevel, colormap);
 
 	HWR_ProcessPolygon(&Surf, wallVerts, 4, blend|PF_Modulated|PF_Clip, SHADER_SPRITE, false); // sprite shader
@@ -4564,22 +4562,21 @@ static void HWR_DrawSprite(gr_vissprite_t *spr)
 			light = R_GetPlaneLight(sector, spr->mobj->z + spr->mobj->height, false); // Always use the light at the top instead of whatever I was doing before
 
 			if (!(spr->mobj->frame & FF_FULLBRIGHT))
-				lightlevel = *sector->lightlist[light].lightlevel;
+			lightlevel = *sector->lightlist[light].lightlevel;
 
-			if (sector->lightlist[light].extra_colormap)
-				colormap = sector->lightlist[light].extra_colormap;
-		}
-		else
-		{
-			if (!(spr->mobj->frame & FF_FULLBRIGHT))
-				lightlevel = sector->lightlevel;
+		if (sector->lightlist[light].extra_colormap)
+			colormap = sector->lightlist[light].extra_colormap;
+	}
+	else
+	{
+		if (!(spr->mobj->frame & FF_FULLBRIGHT))
+			lightlevel = sector->lightlevel;
 
-			if (sector->extra_colormap)
-				colormap = sector->extra_colormap;
-		}
+		if (sector->extra_colormap)
+			colormap = sector->extra_colormap;
+	}
 
 	HWR_Lighting(&Surf, lightlevel, colormap);
-
 	}
 
 	{
@@ -4606,7 +4603,7 @@ static void HWR_DrawSprite(gr_vissprite_t *spr)
 			blend = PF_Translucent|PF_Occlude;
 		}
 
-		HWR_ProcessPolygon(&Surf, wallVerts, 4, blend|PF_Modulated|PF_Clip, SHADER_SPRITE, false); // sprite shader
+	HWR_ProcessPolygon(&Surf, wallVerts, 4, blend|PF_Modulated|PF_Clip, SHADER_SPRITE, false); // sprite shader
 	}
 }
 
@@ -4685,7 +4682,7 @@ static inline void HWR_DrawPrecipitationSprite(gr_vissprite_t *spr)
 				colormap = sector->extra_colormap;
 		}
 
-		HWR_Lighting(&Surf, lightlevel, colormap);	
+	HWR_Lighting(&Surf, lightlevel, colormap);
 	}
 
 	if (spr->mobj->flags2 & MF2_SHADOW)
@@ -4705,7 +4702,6 @@ static inline void HWR_DrawPrecipitationSprite(gr_vissprite_t *spr)
 		blend = PF_Translucent|PF_Occlude;
 	}
 
-	
 	HWR_ProcessPolygon(&Surf, wallVerts, 4, blend|PF_Modulated|PF_Clip, SHADER_SPRITE, false); // sprite shader
 }
 #endif
@@ -5090,7 +5086,7 @@ static void HWR_CreateDrawNodes(void)
 		} //i++
 	} // loop++
 
-	
+
 	// Okay! Let's draw it all! Woo!
 	HWD.pfnSetTransform(&atransform);
 	HWD.pfnSetShader(0);
@@ -5278,33 +5274,27 @@ static void HWR_ProjectSprite(mobj_t *thing)
 	angle_t ang;
 	INT32 heightsec, phs;
 
-   // uncapped/interpolation
-   interpmobjstate_t interp = {0};
-	
-
+	// uncapped/interpolation
+	interpmobjstate_t interp = {0};
 
 	if (!thing)
 		return;
 	else
-     
 
 	if (R_UsingFrameInterpolation())
 	{
-      R_InterpolateMobjState(thing, rendertimefrac, &interp);
+		R_InterpolateMobjState(thing, rendertimefrac, &interp);
 	}
-		else
+	else
 	{
 		R_InterpolateMobjState(thing, FRACUNIT, &interp);
 	}
-
-
 
 	this_scale = FIXED_TO_FLOAT(interp.scale);
 
 	// transform the origin point
 	tr_x = FIXED_TO_FLOAT(interp.x) - gr_viewx;
 	tr_y = FIXED_TO_FLOAT(interp.y) - gr_viewy;
-
 
 	// rotation around vertical axis
 	tz = (tr_x * gr_viewcos) + (tr_y * gr_viewsin);
@@ -5330,7 +5320,6 @@ static void HWR_ProjectSprite(mobj_t *thing)
 	// The above can stay as it works for cutting sprites that are too close
 	tr_x = FIXED_TO_FLOAT(interp.x);
 	tr_y = FIXED_TO_FLOAT(interp.y);
-
 
 	// decide which patch to use for sprite relative to player
 #ifdef RANGECHECK
@@ -5605,7 +5594,7 @@ static void HWR_ProjectPrecipitationSprite(precipmobj_t *thing)
 
 	// set top/bottom coords
 	vis->ty = FIXED_TO_FLOAT(thing->z + spritecachedinfo[lumpoff].topoffset);
-	
+
 	vis->precip = true;
 }
 #endif
@@ -5956,7 +5945,7 @@ static void HWR_SetTransformAiming(FTransform *trans, player_t *player, boolean 
 {
 	// 1 = always on
 	// 2 = chasecam only
-	if (cv_grshearing.value == 1 || (cv_grshearing.value == 2 && R_IsViewpointThirdPerson(player, skybox)))
+	if (cv_grshearing.value == 1 || (cv_grshearing.value == 2 && R_IsViewpointFirstPerson(player, skybox)))
 	{
 		fixed_t fixedaiming = AIMINGTODY(aimingangle);
 		trans->viewaiming = FIXED_TO_FLOAT(fixedaiming);
@@ -6387,6 +6376,10 @@ void HWR_RenderPlayerView(INT32 viewnumber, player_t *player)
 	HWD.pfnGClipRect(0, 0, vid.width, vid.height, NZCLIP_PLANE);
 }
 
+
+// ==========================================================================
+//                                                         3D ENGINE COMMANDS
+// ==========================================================================
 
 
 static void CV_grFov_OnChange(void)

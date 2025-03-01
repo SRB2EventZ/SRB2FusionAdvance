@@ -52,8 +52,6 @@ static const GLubyte white[4] = { 255, 255, 255, 255 };
 // With OpenGL 1.1+, the first texture should be 1
 static GLuint NOTEXTURE_NUM = 0;
 
-
-
 #define      N_PI_DEMI               (M_PIl/2.0f) //(1.5707963268f)
 
 #define      ASPECT_RATIO            (1.0f)  //(320.0f/200.0f)
@@ -1741,6 +1739,7 @@ EXPORT void HWRAPI(SetTexture) (FTextureInfo *pTexInfo)
 
 		w = pTexInfo->width;
 		h = pTexInfo->height;
+
 
 		if ((pTexInfo->grInfo.format == GR_TEXFMT_P_8) ||
 			(pTexInfo->grInfo.format == GR_TEXFMT_AP_88))

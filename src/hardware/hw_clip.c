@@ -77,10 +77,8 @@
 #include "r_opengl/r_opengl.h"
 
 #ifdef HAVE_SPHEREFRUSTRUM
-static GLfloat viewMatrix[16];
-static GLfloat projMatrix[16];
-static GLfloat viewMatrix[16];
-static GLfloat projMatrix[16];
+static GLdouble viewMatrix[16];
+static GLdouble projMatrix[16];
 float frustum[6][4];
 #endif
 
