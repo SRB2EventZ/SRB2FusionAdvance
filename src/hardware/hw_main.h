@@ -92,7 +92,7 @@ extern consvar_t cv_grstaticlighting;
 extern consvar_t cv_grcoronas;
 extern consvar_t cv_grcoronasize;
 #endif
-extern consvar_t cv_grshaders;
+extern consvar_t cv_grshaders, cv_grallowshaders;
 extern consvar_t cv_grfov;
 extern consvar_t cv_grmd2;
 extern consvar_t cv_grmodelinterpolation;

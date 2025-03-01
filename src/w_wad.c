@@ -1771,12 +1771,7 @@ int W_VerifyNMUSlumps(const char *filename)
 		{"RRINGS", 6}, // Rings HUD (not named as SBO)
 		{"YB_", 3}, // Intermission graphics, goes with the above
 		{"M_", 2}, // As does menu stuff
-		#ifdef HWRENDER
-		{"SHADERS", 7},
-		{"SH_", 3},
-		#endif
-
-		{"SHADERS", 7}, // Shader definitions
+		{"SHADERS", 7}, // OpenGL shader definitions
 		{"SH_", 3}, // GLSL shader
 	
 
