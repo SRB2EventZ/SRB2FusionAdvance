@@ -166,6 +166,9 @@ consvar_t cv_grskydome = {"gr_skydome", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL,
 
 consvar_t cv_grmodelrollangle = {"gr_modelrollangle", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 
+CV_PossibleValue_t grsecbright_cons_t[] = {{0, "MIN"}, {255, "MAX"}, {0, NULL}};
+
+consvar_t cv_grsecbright = {"gr_secbright", "0", CV_SAVE, grsecbright_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 
 
 static void CV_filtermode_ONChange(void)
@@ -324,7 +327,7 @@ void HWR_Lighting(FSurfaceInfo *Surface, INT32 light_level, extracolormap_t *col
 	}
 
 	// Clamp the light level, since it can sometimes go out of the 0-255 range from animations
-	light_level = min(max(light_level, 0), 255);
+	light_level = min(max(light_level, cv_grsecbright.value), 255);
 
 	Surface->PolyColor.rgba = poly_color.rgba;
 	Surface->TintColor.rgba = tint_color.rgba;
@@ -6433,6 +6436,7 @@ void HWR_AddCommands(void)
 	CV_RegisterVar(&cv_grspritebillboarding);
 	CV_RegisterVar(&cv_grskydome);
 	CV_RegisterVar(&cv_grmodelrollangle);
+	CV_RegisterVar(&cv_grsecbright);
 }
 
 static inline void HWR_AddEngineCommands(void)
