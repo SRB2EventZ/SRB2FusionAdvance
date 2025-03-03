@@ -651,6 +651,9 @@
     <ClCompile Include="..\hardware\hw_model.c">
       <Filter>Hw_Hardware</Filter>
     </ClCompile>
+    <ClCompile Include="..\hardware\hw_shaders.c">
+      <Filter>Hw_Hardware</Filter>
+    </ClCompile>
     <ClCompile Include="..\hardware\hw_trick.c">
       <Filter>Hw_Hardware</Filter>
     </ClCompile>
