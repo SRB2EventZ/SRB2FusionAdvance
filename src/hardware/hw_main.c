@@ -83,6 +83,12 @@ static void CV_filtermode_ONChange(void);
 static void CV_anisotropic_ONChange(void);
 static void CV_grFov_OnChange(void);
 static void CV_Gammaxxx_ONChange(void);
+static void CV_grpaletterendering_OnChange(void);
+static void CV_grpalettedepth_OnChange(void);
+static void CV_grshaders_OnChange(void);
+
+
+static void HWR_TogglePaletteRendering(void);
 // ==========================================================================
 //                                          3D ENGINE COMMANDS & CONSOLE VARS
 // ==========================================================================
@@ -122,7 +128,7 @@ static CV_PossibleValue_t grfakecontrast_cons_t[] = {{0, "Off"}, {1, "On"}, {2, 
 static CV_PossibleValue_t grshearing_cons_t[] = {{0, "Off"}, {1, "On"}, {2, "Third-person"}, {0, NULL}};
 
 static CV_PossibleValue_t grshaders_cons_t[] = {{0, "Off"}, {1, "On"}, {2, "Ignore custom shaders"}, {0, NULL}};
-consvar_t cv_grshaders = {"gr_shaders", "On", CV_SAVE, grshaders_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grshaders = {"gr_shaders", "On", CV_SAVE|CV_CALL, grshaders_cons_t, CV_grshaders_OnChange, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_grallowshaders = {"gr_allowshaders", "On", CV_NETVAR, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 
 consvar_t cv_grfakecontrast = {"gr_fakecontrast", "Smooth", CV_SAVE, grfakecontrast_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
@@ -172,6 +178,11 @@ CV_PossibleValue_t grsecbright_cons_t[] = {{0, "MIN"}, {255, "MAX"}, {0, NULL}};
 
 consvar_t cv_grsecbright = {"gr_secbright", "0", CV_SAVE, grsecbright_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 
+static CV_PossibleValue_t grpalettedepth_cons_t[] = {{16, "16 bits"}, {24, "24 bits"}, {0, NULL}};
+
+consvar_t cv_grpaletterendering = {"gr_paletterendering", "Off", CV_CALL|CV_SAVE, CV_OnOff, CV_grpaletterendering_OnChange, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_grpalettedepth = {"gr_palettedepth", "16 bits", CV_SAVE|CV_CALL, grpalettedepth_cons_t, CV_grpalettedepth_OnChange, 0, NULL, NULL, 0, 0, NULL};
+
 
 static void CV_filtermode_ONChange(void)
 {
@@ -204,6 +215,31 @@ static void CV_Gammaxxx_ONChange(void)
 {
 	if (rendermode == render_opengl)
 		V_SetPalette(0);
+}
+
+static void CV_grpaletterendering_OnChange(void)
+{
+	if (gr_shadersavailable)
+	{
+		HWR_CompileShaders();
+		HWR_TogglePaletteRendering();
+	}
+}
+
+static void CV_grpalettedepth_OnChange(void)
+{
+	// refresh the screen palette
+	if (HWR_ShouldUsePaletteRendering())
+		HWR_SetPalette(pLocalPalette);
+}
+
+static void CV_grshaders_OnChange(void)
+{
+	if (cv_grpaletterendering.value)
+	{
+		// can't do palette rendering without shaders, so update the state if needed
+		HWR_TogglePaletteRendering();
+	}
 }
 
  
@@ -263,6 +299,23 @@ static line_t *gr_linedef;
 static sector_t *gr_frontsector;
 static sector_t *gr_backsector;
 
+
+// false if shaders have not been initialized yet, or if shaders are not available
+boolean gr_shadersavailable = false;
+
+
+// ==========================================================================
+//   Lighting
+// ==========================================================================
+
+boolean HWR_UseShader(void)
+{
+	return (cv_grshaders.value && gr_shadersavailable);
+}
+
+// Whether the internal state is set to palette rendering or not.
+static boolean gr_palette_rendering_state = false;
+
 // --------------------------------------------------------------------------
 //                                              STUFF FOR THE PROJECTION CODE
 // --------------------------------------------------------------------------
@@ -280,22 +333,10 @@ static float gr_viewsin, gr_viewcos;
 static float gr_viewludsin, gr_viewludcos; // look up down kik test
 static float gr_fovlud;
 
-
 static angle_t gr_aimingangle;
 static void HWR_SetTransformAiming(FTransform *trans, player_t *player, boolean skybox);
 
-// false if shaders have not been initialized yet, or if shaders are not available
-boolean gr_shadersavailable = false;
 
-
-// ==========================================================================
-//   Lighting
-// ==========================================================================
-
-boolean HWR_UseShader(void)
-{
-	return (cv_grshaders.value && gr_shadersavailable);
-}
 
 void HWR_Lighting(FSurfaceInfo *Surface, INT32 light_level, extracolormap_t *colormap)
 {
@@ -351,6 +392,7 @@ void HWR_Lighting(FSurfaceInfo *Surface, INT32 light_level, extracolormap_t *col
 	Surface->LightInfo.light_level = light_level;
 	Surface->LightInfo.fade_start = (colormap != NULL) ? colormap->fadestart : 0;
 	Surface->LightInfo.fade_end = (colormap != NULL) ? colormap->fadeend : 31;
+	Surface->LightTableId = HWR_ShouldUsePaletteRendering() ? HWR_GetLightTableID(colormap) : 0;
 }
 
 
@@ -678,7 +720,7 @@ static void HWR_RenderPlane(sector_t *sector, extrasubsector_t *xsub, boolean is
 #endif
 
 
-	HWR_Lighting(&Surf, lightlevel, planecolormap);
+ HWR_Lighting(&Surf, lightlevel, planecolormap);
 
 if (PolyFlags & (PF_Translucent|PF_Fog))
 	{
@@ -687,15 +729,6 @@ if (PolyFlags & (PF_Translucent|PF_Fog))
 	}
 	else
 		PolyFlags |= PF_Masked|PF_Modulated;
-
-	if (PolyFlags & PF_Fog)
-		shader = SHADER_FOG;	// fog shader
-	else if (PolyFlags & PF_Ripple)
-		shader = SHADER_WATER;	// water shader
-	else
-		shader = SHADER_FLOOR;	// floor shader
-
-
 
 	if (HWR_UseShader())
 	{
@@ -1000,13 +1033,15 @@ static void HWR_SplitWall(sector_t *sector, FOutVector *wallVerts, INT32 texnum,
 		{
 			if (pfloor && (pfloor->flags & FF_FOG))
 			{
-				lightnum = HWR_CalcWallLight(pfloor->master->frontsector->lightlevel, v1x, v1y, v2x, v2y);
+				lightnum = pfloor->master->frontsector->lightlevel;
 				colormap = pfloor->master->frontsector->extra_colormap;
+				lightnum = colormap ? lightnum : HWR_CalcWallLight(lightnum, v1x, v1y, v2x, v2y);
 			}
 			else
 			{
-				lightnum = HWR_CalcWallLight(*list[i].lightlevel, v1x, v1y, v2x, v2y);
+				lightnum = *list[i].lightlevel;
 				colormap = list[i].extra_colormap;
+				lightnum = colormap ? lightnum : HWR_CalcWallLight(lightnum, v1x, v1y, v2x, v2y);
 			}
 		}
 
@@ -1300,8 +1335,9 @@ static void HWR_ProcessSeg(void) // Sort of like GLWall::Process in GZDoom
 
 	}
 
-	lightnum = HWR_CalcWallLight(gr_frontsector->lightlevel, vs.x, vs.y, ve.x, ve.y);
+	lightnum = gr_frontsector->lightlevel;
 	colormap = gr_frontsector->extra_colormap;
+	lightnum = colormap ? lightnum : HWR_CalcWallLight(lightnum, vs.x, vs.y, ve.x, ve.y);
 
 	if (gr_frontsector)
 	{
@@ -2065,8 +2101,9 @@ static void HWR_ProcessSeg(void) // Sort of like GLWall::Process in GZDoom
 
 					blendmode = PF_Fog|PF_NoTexture;
 
-					lightnum = HWR_CalcWallLight(rover->master->frontsector->lightlevel, vs.x, vs.y, ve.x, ve.y);
+					lightnum = rover->master->frontsector->lightlevel;
 					colormap = rover->master->frontsector->extra_colormap;
+					lightnum = colormap ? lightnum : HWR_CalcWallLight(lightnum, vs.x, vs.y, ve.x, ve.y);
 
 					Surf.PolyColor.s.alpha = HWR_FogBlockAlpha(rover->master->frontsector->lightlevel, rover->master->frontsector->extra_colormap);
 
@@ -2177,8 +2214,9 @@ static void HWR_ProcessSeg(void) // Sort of like GLWall::Process in GZDoom
 
 					blendmode = PF_Fog|PF_NoTexture;
 
-					lightnum = HWR_CalcWallLight(rover->master->frontsector->lightlevel, vs.x, vs.y, ve.x, ve.y);
+					lightnum = rover->master->frontsector->lightlevel;
 					colormap = rover->master->frontsector->extra_colormap;
+					lightnum = colormap ? lightnum : HWR_CalcWallLight(lightnum, vs.x, vs.y, ve.x, ve.y);
 
 					Surf.PolyColor.s.alpha = HWR_FogBlockAlpha(rover->master->frontsector->lightlevel, rover->master->frontsector->extra_colormap);
 
@@ -3649,8 +3687,6 @@ static void HWR_RenderBSPNode(INT32 bspnum)
 {
 	node_t *bsp;
 	INT32 side;
-
-
 	while (!(bspnum & NF_SUBSECTOR))  // Found a subsector?
 	{
 		bsp = &nodes[bspnum];
@@ -3658,7 +3694,7 @@ static void HWR_RenderBSPNode(INT32 bspnum)
 		// Decide which side the view point is on.
 		side = R_PointOnSideFast(viewx, viewy, bsp);
 		// BP: big hack for a test in lighning ref : 1249753487AB
-		hwbbox = bsp->bbox[side];
+		hwbbox = bsp->bbox[side^1];
 		// Recursively divide front space.
 		HWR_RenderBSPNode(bsp->children[side]);
 
@@ -3672,6 +3708,7 @@ static void HWR_RenderBSPNode(INT32 bspnum)
 
 	HWR_Subsector(bspnum == -1 ? 0 : bspnum & ~NF_SUBSECTOR);
 }
+
 
 
 
@@ -6053,6 +6090,7 @@ void HWR_RenderSkyboxView(INT32 viewnumber, player_t *player)
 	else
 		type = &postimgtype;
 
+	if (!HWR_ShouldUsePaletteRendering())
 	{
 		// do we really need to save player (is it not the same)?
 		player_t *saved_player = stplyr;
@@ -6266,6 +6304,7 @@ void HWR_RenderPlayerView(INT32 viewnumber, player_t *player)
 	if (skybox && drawsky) // If there's a skybox and we should be drawing the sky, draw the skybox
 		HWR_RenderSkyboxView(viewnumber, player); // This is drawn before everything else so it is placed behind
 
+	if (!HWR_ShouldUsePaletteRendering())
 	{
 		// do we really need to save player (is it not the same)?
 		player_t *saved_player = stplyr;
@@ -6453,6 +6492,56 @@ void HWR_RenderPlayerView(INT32 viewnumber, player_t *player)
 	HWD.pfnGClipRect(0, 0, vid.width, vid.height, NZCLIP_PLANE);
 }
 
+// Returns whether palette rendering is "actually enabled."
+// Can't have palette rendering if shaders are disabled.
+boolean HWR_ShouldUsePaletteRendering(void)
+{
+	return (cv_grpaletterendering.value && HWR_UseShader());
+}
+
+// enable or disable palette rendering state depending on settings and availability
+// called when relevant settings change
+// shader recompilation is done in the cvar callback
+static void HWR_TogglePaletteRendering(void)
+{
+	// which state should we go to?
+	if (HWR_ShouldUsePaletteRendering())
+	{
+		// are we not in that state already?
+		if (!gr_palette_rendering_state)
+		{
+			gr_palette_rendering_state = true;
+
+			// The textures will still be converted to RGBA by r_opengl.
+			// This however makes hw_cache use paletted blending for composite textures!
+			// (patchformat is not touched)
+			textureformat = GR_TEXFMT_P_8;
+
+			HWR_SetMapPalette();
+			HWR_SetPalette(pLocalPalette);
+
+			// If the r_opengl "texture palette" stays the same during this switch, the textures
+			// will not be cleared out. However they are still out of date since the
+			// composite texture blending method has changed. Therefore they need to be cleared.
+			HWD.pfnClearMipMapCache();
+		}
+	}
+	else
+	{
+		// are we not in that state already?
+		if (gr_palette_rendering_state)
+		{
+			gr_palette_rendering_state = false;
+			textureformat = GR_RGBA;
+			HWR_SetPalette(pLocalPalette);
+			// If the r_opengl "texture palette" stays the same during this switch, the textures
+			// will not be cleared out. However they are still out of date since the
+			// composite texture blending method has changed. Therefore they need to be cleared.
+			HWD.pfnClearMipMapCache();
+		}
+	}
+}
+
 
 // ==========================================================================
 //                                                         3D ENGINE COMMANDS
@@ -6488,7 +6577,9 @@ void HWR_AddCommands(void)
 	CV_RegisterVar(&cv_granisotropicmode);
 	CV_RegisterVar(&cv_grcorrecttricks);
 	CV_RegisterVar(&cv_grsolvetjoin);
-	CV_RegisterVar(&cv_grbatching);
+	CV_RegisterVar(&cv_grbatching);	
+	CV_RegisterVar(&cv_grpaletterendering);
+	CV_RegisterVar(&cv_grpalettedepth);
 	CV_RegisterVar(&cv_grmodellighting);
 	CV_RegisterVar(&cv_glloadingscreen);
 	CV_RegisterVar(&cv_grshearing);
@@ -6545,6 +6636,8 @@ void HWR_Startup(void)
 	{
 		CONS_Printf("HWR_Startup()...\n");
 
+		textureformat = patchformat = GR_RGBA;
+
 		HWR_InitPolyPool();
 		// add console cmds & vars
 		HWR_AddEngineCommands();
@@ -6558,16 +6651,9 @@ void HWR_Startup(void)
 
 	gr_shadersavailable = HWR_InitShaders();
 	HWR_LoadAllCustomShaders();
+	HWR_TogglePaletteRendering();
 	}
-
-	if (rendermode == render_opengl)
-		textureformat = patchformat =
-#ifdef _NDS
-			GR_TEXFMT_P_8;
-#else
-			GR_RGBA;
-#endif
-
+	
 	startupdone = true;
 }
 
@@ -6701,7 +6787,7 @@ void HWR_DoPostProcessor(player_t *player)
 
 	// Armageddon Blast Flash!
 	// Could this even be considered postprocessor?
-	if (player->flashcount)
+	if (player->flashcount && !HWR_ShouldUsePaletteRendering())
 	{
 		FOutVector      v[4];
 		FSurfaceInfo Surf;
