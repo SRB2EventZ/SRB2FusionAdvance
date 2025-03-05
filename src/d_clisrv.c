@@ -46,7 +46,7 @@
 #include "lzf.h"
 #include "lua_script.h"
 #include "lua_hook.h"
-#include "md5.h" 
+#include "md5.h"
 #include "r_fps.h"
 
 #ifdef CLIENT_LOADINGSCREEN
@@ -1718,7 +1718,7 @@ void CL_UpdateServerList(boolean internetsearch, INT32 room)
 
 	if (internetsearch)
 	{
-		const msg_server_t *server_list;
+		const msg_ext_server_t *server_list;
 		INT32 i = -1;
 		server_list = GetShortServersList(room);
 		if (server_list)
@@ -2410,28 +2410,31 @@ static void CL_RemovePlayer(INT32 playernum, INT32 reason)
 	// the remaining players.
 	if (G_IsSpecialStage(gamemap))
 	{
-		INT32 i, count, increment, rings;
+		INT32 count = 0;
 
-		for (i = 0, count = 0; i < MAXPLAYERS; i++)
+		for (INT32 i = 0; i < MAXPLAYERS; i++)
 		{
 			if (playeringame[i])
 				count++;
 		}
 
 		count--;
-		rings = players[playernum].health - 1;
-		increment = rings/count;
-
-		for (i = 0; i < MAXPLAYERS; i++)
+		if(count > 0)
 		{
-			if (playeringame[i] && i != playernum)
-			{
-				if (rings < increment)
-					P_GivePlayerRings(&players[i], rings);
-				else
-					P_GivePlayerRings(&players[i], increment);
+			INT32 rings = players[playernum].health - 1;
+			INT32 increment = rings/count;
 
-				rings -= increment;
+			for (INT32 i = 0; i < MAXPLAYERS; i++)
+			{
+				if (playeringame[i] && i != playernum)
+				{
+					if (rings < increment)
+						P_GivePlayerRings(&players[i], rings);
+					else
+						P_GivePlayerRings(&players[i], increment);
+
+					rings -= increment;
+				}
 			}
 		}
 	}
@@ -4710,7 +4713,7 @@ boolean TryRunTics(tic_t realtics)
 			// run the count * tics
 			while (neededtic > gametic)
 			{
-				DEBFILE(va("============ Running tic %d (local %d)\n", gametic, localgametic)); 
+				DEBFILE(va("============ Running tic %d (local %d)\n", gametic, localgametic));
 
 				G_Ticker((gametic % NEWTICRATERATIO) == 0);
 				ExtraDataTicker();
