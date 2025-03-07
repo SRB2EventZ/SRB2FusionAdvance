@@ -2843,7 +2843,7 @@ clipsolid:
 //
 // modified to use local variables
 
-static boolean HWR_CheckBBox(fixed_t *bspcoord)
+static boolean HWR_CheckBBox(const fixed_t *bspcoord)
 {
 	INT32 boxpos;
 	fixed_t px1, py1, px2, py2;
@@ -3640,16 +3640,14 @@ static void HWR_RenderBSPNode(INT32 bspnum)
 {
 	node_t *bsp;
 	INT32 side;
-
-
 	while (!(bspnum & NF_SUBSECTOR))  // Found a subsector?
 	{
 		bsp = &nodes[bspnum];
 
 		// Decide which side the view point is on.
-		side = R_PointOnSideFast(viewx, viewy, bsp);
+		side = R_PointOnSide(viewx, viewy, bsp);
 		// BP: big hack for a test in lighning ref : 1249753487AB
-		hwbbox = bsp->bbox[side];
+		hwbbox = bsp->bbox[side^1];
 		// Recursively divide front space.
 		HWR_RenderBSPNode(bsp->children[side]);
 
@@ -3663,8 +3661,6 @@ static void HWR_RenderBSPNode(INT32 bspnum)
 
 	HWR_Subsector(bspnum == -1 ? 0 : bspnum & ~NF_SUBSECTOR);
 }
-
-
 
 /*
 //
