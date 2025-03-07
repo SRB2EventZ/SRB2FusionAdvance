@@ -790,6 +790,7 @@ UINT16 W_InitFile(const char *filename)
 	numwadfiles++; // must come BEFORE W_LoadDehackedLumps, so any addfile called by COM_BufInsertText called by Lua doesn't overwrite what we just loaded
 
 #ifdef HWRENDER
+if(rendermode == render_opengl)
 	HWR_LoadCustomShadersFromFile(numwadfiles - 1, (type == RET_PK3));
 #endif // HWRENDER
 
@@ -1768,8 +1769,6 @@ int W_VerifyNMUSlumps(const char *filename)
 		{"M_", 2}, // As does menu stuff
 		{"SHADERS", 7}, // OpenGL shader definitions
 		{"SH_", 3}, // GLSL shader
-	
-
 		{NULL, 0},
 	};
 	return W_VerifyFile(filename, NMUSlist, false);
