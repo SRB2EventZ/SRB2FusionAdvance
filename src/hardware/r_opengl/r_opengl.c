@@ -31,6 +31,7 @@
 #include <math.h>
 #include "r_opengl.h"
 #include "r_vbo.h"
+#include "r_vbo.h"
 
 #if defined (HWRENDER) && !defined (NOROPENGL)
 
@@ -50,8 +51,6 @@ static const GLubyte white[4] = { 255, 255, 255, 255 };
 
 // With OpenGL 1.1+, the first texture should be 1
 static GLuint NOTEXTURE_NUM = 0;
-
-
 
 #define      N_PI_DEMI               (M_PIl/2.0f) //(1.5707963268f)
 
@@ -93,8 +92,7 @@ static GLfloat    modelMatrix[16];
 static GLfloat    projMatrix[16];
 static GLint       viewport[4];
 
-
- 
+  
 // Sryder:	NextTexAvail is broken for these because palette changes or changes to the texture filter or antialiasing
 //			flush all of the stored textures, leaving them unavailable at times such as between levels
 //			These need to start at 0 and be set to their number, and be reset to 0 when deleted so that intel GPUs
@@ -105,12 +103,6 @@ static GLuint endScreenWipe = 0;
 static GLuint finalScreenTexture = 0;
 
 
-// Lactozilla: Shader functions
-static void *Shader_Load(FSurfaceInfo *Surface, GLRGBAFloat *poly, GLRGBAFloat *tint, GLRGBAFloat *fade);
-static void Shader_SetUniforms(FSurfaceInfo *Surface, GLRGBAFloat *poly, GLRGBAFloat *tint, GLRGBAFloat *fade);
-static void Shader_CompileError(const char *message, GLuint program, INT32 shadernum);
-
-static GLRGBAFloat shader_defaultcolor = {1.0f, 1.0f, 1.0f, 1.0f};
 
 // shortcut for ((float)1/i)
 static const GLfloat byte2float[256] = {
@@ -557,6 +549,7 @@ typedef void 	(APIENTRY *PFNglGetShaderiv)		(GLuint, GLenum, GLint*);
 typedef void 	(APIENTRY *PFNglGetShaderInfoLog)	(GLuint, GLsizei, GLsizei*, GLchar*);
 typedef void 	(APIENTRY *PFNglDeleteShader)		(GLuint);
 typedef GLuint 	(APIENTRY *PFNglCreateProgram)		(void);
+typedef void  	(APIENTRY *PFNglDeleteProgram)		(GLuint);
 typedef void 	(APIENTRY *PFNglAttachShader)		(GLuint, GLuint);
 typedef void 	(APIENTRY *PFNglLinkProgram)		(GLuint);
 typedef void 	(APIENTRY *PFNglGetProgramiv)		(GLuint, GLenum, GLint*);
@@ -578,6 +571,7 @@ static PFNglGetShaderiv pglGetShaderiv;
 static PFNglGetShaderInfoLog pglGetShaderInfoLog;
 static PFNglDeleteShader pglDeleteShader;
 static PFNglCreateProgram pglCreateProgram;
+static PFNglDeleteProgram pglDeleteProgram;
 static PFNglAttachShader pglAttachShader;
 static PFNglLinkProgram pglLinkProgram;
 static PFNglGetProgramiv pglGetProgramiv;
@@ -595,13 +589,8 @@ static PFNglGetUniformLocation pglGetUniformLocation;
 
 
 // 18032019
-static boolean gl_allowshaders = false;
 static boolean gl_shadersenabled = false;
-static GLuint gl_currentshaderprogram = 0;
-static boolean gl_shaderprogramchanged = true;
-
-
-static shadersource_t gl_customshaders[HWR_MAXSHADERS];
+static hwdshaderoption_t gl_allowshaders = HWD_SHADEROPTION_OFF;
 
 // 13062019
 typedef enum
@@ -620,16 +609,38 @@ typedef enum
 	gluniform_max,
 } gluniform_t;
 
-typedef struct gl_shaderprogram_s
+
+typedef struct gl_shader_s
 {
 	GLuint program;
-	boolean custom;
 	GLint uniforms[gluniform_max+1];
-} gl_shaderprogram_t;
-static gl_shaderprogram_t gl_shaderprograms[HWR_MAXSHADERS];
+	boolean custom;
+} gl_shader_t;
+
+static gl_shader_t gl_shaders[HWR_MAXSHADERS];
+static gl_shader_t gl_usershaders[HWR_MAXSHADERS];
+static shadersource_t gl_customshaders[HWR_MAXSHADERS];
+
+// 09102020
+typedef struct gl_shaderstate_s
+{
+	gl_shader_t *current;
+	GLuint type;
+	GLuint program;
+	boolean changed;
+} gl_shaderstate_t;
+static gl_shaderstate_t gl_shaderstate;
 
 // Shader info
 static INT32 shader_leveltime = 0;
+
+
+// Lactozilla: Shader functions
+static boolean Shader_CompileProgram(gl_shader_t *shader, GLint i, const GLchar *vert_shader, const GLchar *frag_shader);
+static void Shader_CompileError(const char *message, GLuint program, INT32 shadernum);
+static void Shader_SetUniforms(FSurfaceInfo *Surface, GLRGBAFloat *poly, GLRGBAFloat *tint, GLRGBAFloat *fade);
+
+static GLRGBAFloat shader_defaultcolor = {1.0f, 1.0f, 1.0f, 1.0f};
 
 // ================
 //  Vertex shaders
@@ -639,8 +650,6 @@ static INT32 shader_leveltime = 0;
 //
 // Generic vertex shader
 //
-
-
 #define GLSL_DEFAULT_VERTEX_SHADER \
 	"void main()\n" \
 	"{\n" \
@@ -892,6 +901,7 @@ void SetupGLFunc4(void)
 	pglGetShaderInfoLog = GetGLFunc("glGetShaderInfoLog");
 	pglDeleteShader = GetGLFunc("glDeleteShader");
 	pglCreateProgram = GetGLFunc("glCreateProgram");
+	pglDeleteProgram = GetGLFunc("glDeleteProgram");
 	pglAttachShader = GetGLFunc("glAttachShader");
 	pglLinkProgram = GetGLFunc("glLinkProgram");
 	pglGetProgramiv = GetGLFunc("glGetProgramiv");
@@ -912,20 +922,40 @@ void SetupGLFunc4(void)
 EXPORT boolean HWRAPI(CompileShaders) (void)
 {
 #ifdef GL_SHADERS
-	GLuint gl_vertShader, gl_fragShader;
-	GLint i, result;
+	GLint i;
 
-	if (!pglUseProgram) return false;
+	if (!pglUseProgram)
+		return false;
 
-	gl_customshaders[0].vertex = NULL;
-	gl_customshaders[0].fragment = NULL;
+	gl_customshaders[SHADER_DEFAULT].vertex = NULL;
+	gl_customshaders[SHADER_DEFAULT].fragment = NULL;
 
 	for (i = 0; gl_shadersources[i].vertex && gl_shadersources[i].fragment; i++)
 	{
-		gl_shaderprogram_t *shader;
+		gl_shader_t *shader, *usershader;
 		const GLchar *vert_shader = gl_shadersources[i].vertex;
 		const GLchar *frag_shader = gl_shadersources[i].fragment;
-		boolean custom = ((gl_customshaders[i].vertex || gl_customshaders[i].fragment) && (i > 0));
+
+		if (i >= HWR_MAXSHADERS)
+			break;
+
+		shader = &gl_shaders[i];
+		usershader = &gl_usershaders[i];
+
+		if (shader->program)
+			pglDeleteProgram(shader->program);
+		if (usershader->program)
+			pglDeleteProgram(usershader->program);
+
+		shader->program = 0;
+		usershader->program = 0;
+
+		if (!Shader_CompileProgram(shader, i, vert_shader, frag_shader))
+			shader->program = 0;
+
+		// Compile custom shader
+		if ((i == SHADER_DEFAULT) || !(gl_customshaders[i].vertex || gl_customshaders[i].fragment))
+			continue;
 
 		// 18032019
 		if (gl_customshaders[i].vertex)
@@ -933,97 +963,21 @@ EXPORT boolean HWRAPI(CompileShaders) (void)
 		if (gl_customshaders[i].fragment)
 			frag_shader = gl_customshaders[i].fragment;
 
-		if (i >= HWR_MAXSHADERS)
-			break;
-
-		shader = &gl_shaderprograms[i];
-		shader->program = 0;
-		shader->custom = custom;
-
-		//
-		// Load and compile vertex shader
-		//
-		gl_vertShader = pglCreateShader(GL_VERTEX_SHADER);
-		if (!gl_vertShader)
+		if (!Shader_CompileProgram(usershader, i, vert_shader, frag_shader))
 		{
-			GL_MSG_Error("CompileShaders: Error creating vertex shader %s\n", HWR_GetShaderName(i));
-			continue;
+			GL_MSG_Warning("CompileShaders: Could not compile custom shader program for %s\n", HWR_GetShaderName(i));
+			usershader->program = 0;
 		}
-
-		pglShaderSource(gl_vertShader, 1, &vert_shader, NULL);
-		pglCompileShader(gl_vertShader);
-
-		// check for compile errors
-		pglGetShaderiv(gl_vertShader, GL_COMPILE_STATUS, &result);
-		if (result == GL_FALSE)
-		{
-			Shader_CompileError("Error compiling vertex shader", gl_vertShader, i);
-			continue;
-		}
-
-		//
-		// Load and compile fragment shader
-		//
-		gl_fragShader = pglCreateShader(GL_FRAGMENT_SHADER);
-		if (!gl_fragShader)
-		{
-			GL_MSG_Error("CompileShaders: Error creating fragment shader %s\n", HWR_GetShaderName(i));
-			continue;
-		}
-
-		pglShaderSource(gl_fragShader, 1, &frag_shader, NULL);
-		pglCompileShader(gl_fragShader);
-
-		// check for compile errors
-		pglGetShaderiv(gl_fragShader, GL_COMPILE_STATUS, &result);
-		if (result == GL_FALSE)
-		{
-			Shader_CompileError("Error compiling fragment shader", gl_fragShader, i);
-			continue;
-		}
-
-		shader->program = pglCreateProgram();
-		pglAttachShader(shader->program, gl_vertShader);
-		pglAttachShader(shader->program, gl_fragShader);
-		pglLinkProgram(shader->program);
-
-		// check link status
-		pglGetProgramiv(shader->program, GL_LINK_STATUS, &result);
-
-		// delete the shader objects
-		pglDeleteShader(gl_vertShader);
-		pglDeleteShader(gl_fragShader);
-
-		// couldn't link?
-		if (result != GL_TRUE)
-		{
-			shader->program = 0;
-			shader->custom = false;
-			GL_MSG_Error("CompileShaders: Error linking shader program %s\n", HWR_GetShaderName(i));
-			continue;
-		}
-
-		// 13062019
-#define GETUNI(uniform) pglGetUniformLocation(shader->program, uniform);
-
-		// lighting
-		shader->uniforms[gluniform_poly_color] = GETUNI("poly_color");
-		shader->uniforms[gluniform_tint_color] = GETUNI("tint_color");
-		shader->uniforms[gluniform_fade_color] = GETUNI("fade_color");
-		shader->uniforms[gluniform_lighting] = GETUNI("lighting");
-		shader->uniforms[gluniform_fade_start] = GETUNI("fade_start");
-		shader->uniforms[gluniform_fade_end] = GETUNI("fade_end");
-
-		// misc. (custom shaders)
-		shader->uniforms[gluniform_leveltime] = GETUNI("leveltime");
-
-#undef GETUNI
 	}
+
+	SetShader(SHADER_DEFAULT);
+
 	return true;
 #else
 	return false;
 #endif
 }
+
 
 
 //
@@ -1088,41 +1042,62 @@ EXPORT void HWRAPI(LoadCustomShader) (int number, char *code, size_t size, boole
 }
 
 
-EXPORT void HWRAPI(SetShader) (int shader)
+EXPORT void HWRAPI(SetShader) (int type)
 {
 #ifdef GL_SHADERS
-	if (gl_allowshaders)
+	if (gl_allowshaders != HWD_SHADEROPTION_OFF)
 	{
+		gl_shader_t *shader = gl_shaderstate.current;
+
 		// If using model lighting, set the appropriate shader.
 		// However don't override a custom shader.
-		// Should use an enum or something...
-		if (shader == SHADER_MODEL && model_lighting
-			&& !(gl_shaderprograms[SHADER_MODEL].custom && !gl_shaderprograms[SHADER_MODEL_LIGHTING].custom))
-				shader = SHADER_MODEL_LIGHTING;	
+		if (type == SHADER_MODEL && model_lighting
+		&& !(gl_shaders[SHADER_MODEL].custom && !gl_shaders[SHADER_MODEL_LIGHTING].custom))
+			type = SHADER_MODEL_LIGHTING;
 
-		if ((GLuint)shader != gl_currentshaderprogram)
+		if ((shader == NULL) || (GLuint)type != gl_shaderstate.type)
 		{
-			gl_currentshaderprogram = shader;
-			gl_shaderprogramchanged = true;
+			gl_shader_t *baseshader = &gl_shaders[type];
+			gl_shader_t *usershader = &gl_usershaders[type];
+
+			if (usershader->program)
+				shader = (gl_allowshaders == HWD_SHADEROPTION_NOCUSTOM) ? baseshader : usershader;
+			else
+				shader = baseshader;
+
+			gl_shaderstate.current = shader;
+			gl_shaderstate.type = type;
+			gl_shaderstate.changed = true;
 		}
-		
-		gl_shadersenabled = true;
+
+		if (gl_shaderstate.program != shader->program)
+		{
+			gl_shaderstate.program = shader->program;
+			gl_shaderstate.changed = true;
+		}
+
+		gl_shadersenabled = (shader->program != 0);
 		return;
 	}
 #else
-	(void)shader;
+	(void)type;
 #endif
 	gl_shadersenabled = false;
 }
 
+
 EXPORT void HWRAPI(UnSetShader) (void)
 {
 #ifdef GL_SHADERS
-	gl_shadersenabled = false;
-	gl_currentshaderprogram = 0;
-	if (!pglUseProgram) return;
-	pglUseProgram(0);
+	gl_shaderstate.current = NULL;
+	gl_shaderstate.type = 0;
+	gl_shaderstate.program = 0;
+
+	if (pglUseProgram)
+		pglUseProgram(0);
 #endif
+
+	gl_shadersenabled = false;
 }
 
 EXPORT void HWRAPI(CleanShaders) (void)
@@ -1930,50 +1905,32 @@ EXPORT void HWRAPI(SetTexture) (FTextureInfo *pTexInfo)
 	}
 }
 
-static void *Shader_Load(FSurfaceInfo *Surface, GLRGBAFloat *poly, GLRGBAFloat *tint, GLRGBAFloat *fade)
-{
-#ifdef GL_SHADERS
-	if (gl_shadersenabled && pglUseProgram)
-	{
-		gl_shaderprogram_t *shader = &gl_shaderprograms[gl_currentshaderprogram];
-		if (shader->program)
-		{
-			if (gl_shaderprogramchanged)
-			{
-				pglUseProgram(gl_shaderprograms[gl_currentshaderprogram].program);
-				gl_shaderprogramchanged = false;
-			}
-			Shader_SetUniforms(Surface, poly, tint, fade);
-			return shader;
-		}
-		else
-			pglUseProgram(0);
-	}
-#else
-	(void)Surface;
-	(void)poly;
-	(void)tint;
-	(void)fade;
-#endif
-	return NULL;
-}
-
 static void Shader_SetUniforms(FSurfaceInfo *Surface, GLRGBAFloat *poly, GLRGBAFloat *tint, GLRGBAFloat *fade)
 {
 #ifdef GL_SHADERS
-	if (gl_shadersenabled)
-	{
-		gl_shaderprogram_t *shader = &gl_shaderprograms[gl_currentshaderprogram];
-		if (!shader->program)
-			return;
+	gl_shader_t *shader = gl_shaderstate.current;
 
-			// Color uniforms can be left NULL and will be set to white (1.0f, 1.0f, 1.0f, 1.0f)
-				if (poly == NULL)
-				poly = &shader_defaultcolor;
-			if (tint == NULL)
-				tint = &shader_defaultcolor;
-			if (fade == NULL)
-				fade = &shader_defaultcolor;	
+	if (gl_shadersenabled && (shader != NULL) && pglUseProgram)
+	{
+		if (!shader->program)
+		{
+			pglUseProgram(0);
+			return;
+		}
+
+		if (gl_shaderstate.changed)
+		{
+			pglUseProgram(shader->program);
+			gl_shaderstate.changed = false;
+		}
+
+		// Color uniforms can be left NULL and will be set to white (1.0f, 1.0f, 1.0f, 1.0f)
+		if (poly == NULL)
+			poly = &shader_defaultcolor;
+		if (tint == NULL)
+			tint = &shader_defaultcolor;
+		if (fade == NULL)
+			fade = &shader_defaultcolor;
 
 		#define UNIFORM_1(uniform, a, function) \
 			if (uniform != -1) \
@@ -1995,12 +1952,14 @@ static void Shader_SetUniforms(FSurfaceInfo *Surface, GLRGBAFloat *poly, GLRGBAF
 		UNIFORM_4(shader->uniforms[gluniform_poly_color], poly->red, poly->green, poly->blue, poly->alpha, pglUniform4f);
 		UNIFORM_4(shader->uniforms[gluniform_tint_color], tint->red, tint->green, tint->blue, tint->alpha, pglUniform4f);
 		UNIFORM_4(shader->uniforms[gluniform_fade_color], fade->red, fade->green, fade->blue, fade->alpha, pglUniform4f);
+
 		if (Surface != NULL)
 		{
 			UNIFORM_1(shader->uniforms[gluniform_lighting], Surface->LightInfo.light_level, pglUniform1f);
 			UNIFORM_1(shader->uniforms[gluniform_fade_start], Surface->LightInfo.fade_start, pglUniform1f);
 			UNIFORM_1(shader->uniforms[gluniform_fade_end], Surface->LightInfo.fade_end, pglUniform1f);
 		}
+
 		UNIFORM_1(shader->uniforms[gluniform_leveltime], ((float)shader_leveltime) / TICRATE, pglUniform1f);
 
 		#undef UNIFORM_1
@@ -2014,6 +1973,97 @@ static void Shader_SetUniforms(FSurfaceInfo *Surface, GLRGBAFloat *poly, GLRGBAF
 	(void)tint;
 	(void)fade;
 #endif
+}
+
+static boolean Shader_CompileProgram(gl_shader_t *shader, GLint i, const GLchar *vert_shader, const GLchar *frag_shader)
+{
+	GLuint gl_vertShader, gl_fragShader;
+	GLint result;
+
+	//
+	// Load and compile vertex shader
+	//
+	gl_vertShader = pglCreateShader(GL_VERTEX_SHADER);
+	if (!gl_vertShader)
+	{
+		GL_MSG_Error("Shader_CompileProgram: Error creating vertex shader %s\n", HWR_GetShaderName(i));
+		return false;
+	}
+
+	pglShaderSource(gl_vertShader, 1, &vert_shader, NULL);
+	pglCompileShader(gl_vertShader);
+
+	// check for compile errors
+	pglGetShaderiv(gl_vertShader, GL_COMPILE_STATUS, &result);
+	if (result == GL_FALSE)
+	{
+		Shader_CompileError("Error compiling vertex shader", gl_vertShader, i);
+		pglDeleteShader(gl_vertShader);
+		return false;
+	}
+
+	//
+	// Load and compile fragment shader
+	//
+	gl_fragShader = pglCreateShader(GL_FRAGMENT_SHADER);
+	if (!gl_fragShader)
+	{
+		GL_MSG_Error("Shader_CompileProgram: Error creating fragment shader %s\n", HWR_GetShaderName(i));
+		pglDeleteShader(gl_vertShader);
+		pglDeleteShader(gl_fragShader);
+		return false;
+	}
+
+	pglShaderSource(gl_fragShader, 1, &frag_shader, NULL);
+	pglCompileShader(gl_fragShader);
+
+	// check for compile errors
+	pglGetShaderiv(gl_fragShader, GL_COMPILE_STATUS, &result);
+	if (result == GL_FALSE)
+	{
+		Shader_CompileError("Error compiling fragment shader", gl_fragShader, i);
+		pglDeleteShader(gl_vertShader);
+		pglDeleteShader(gl_fragShader);
+		return false;
+	}
+
+	shader->program = pglCreateProgram();
+	pglAttachShader(shader->program, gl_vertShader);
+	pglAttachShader(shader->program, gl_fragShader);
+	pglLinkProgram(shader->program);
+
+	// check link status
+	pglGetProgramiv(shader->program, GL_LINK_STATUS, &result);
+
+	// delete the shader objects
+	pglDeleteShader(gl_vertShader);
+	pglDeleteShader(gl_fragShader);
+
+	// couldn't link?
+	if (result != GL_TRUE)
+	{
+		GL_MSG_Error("Shader_CompileProgram: Error linking shader program %s\n", HWR_GetShaderName(i));
+		pglDeleteProgram(shader->program);
+		return false;
+	}
+
+	// 13062019
+#define GETUNI(uniform) pglGetUniformLocation(shader->program, uniform);
+
+	// lighting
+	shader->uniforms[gluniform_poly_color] = GETUNI("poly_color");
+	shader->uniforms[gluniform_tint_color] = GETUNI("tint_color");
+	shader->uniforms[gluniform_fade_color] = GETUNI("fade_color");
+	shader->uniforms[gluniform_lighting] = GETUNI("lighting");
+	shader->uniforms[gluniform_fade_start] = GETUNI("fade_start");
+	shader->uniforms[gluniform_fade_end] = GETUNI("fade_end");
+
+	// misc. (custom shaders)
+	shader->uniforms[gluniform_leveltime] = GETUNI("leveltime");
+
+#undef GETUNI
+
+	return true;
 }
 
 
@@ -2030,7 +2080,7 @@ static void Shader_CompileError(const char *message, GLuint program, INT32 shade
 		pglGetShaderInfoLog(program, logLength, NULL, infoLog);
 	}
 
-	GL_MSG_Error("CompileShaders: %s (%s)\n%s", message, HWR_GetShaderName(shadernum), (infoLog ? infoLog : ""));
+	GL_MSG_Error("Shader_CompileProgram: %s (%s)\n%s", message, HWR_GetShaderName(shadernum), (infoLog ? infoLog : ""));
 
 	if (infoLog)
 		free(infoLog);
@@ -2050,32 +2100,34 @@ static void PreparePolygon(FSurfaceInfo *pSurf, FOutVector *pOutVerts, FBITFIELD
 
 	SetBlend(PolyFlags);    //TODO: inline (#pragma..)
 
-	// PolyColor
 	if (pSurf)
 	{
-		// If Modulated, mix the surface colour to the texture
+		// If modulated, mix the surface colour to the texture
 		if (CurrentPolyFlags & PF_Modulated)
-		{
-			// Poly color
-			poly.red    = byte2float[pSurf->PolyColor.s.red];
-			poly.green  = byte2float[pSurf->PolyColor.s.green];
-			poly.blue   = byte2float[pSurf->PolyColor.s.blue];
-			poly.alpha  = byte2float[pSurf->PolyColor.s.alpha];
-
 			pglColor4ubv((GLubyte*)&pSurf->PolyColor.s);
+
+		// If the surface is either modulated or colormapped, or both
+		if (CurrentPolyFlags & (PF_Modulated | PF_ColorMapped))
+		{
+			poly.red   = byte2float[pSurf->PolyColor.s.red];
+			poly.green = byte2float[pSurf->PolyColor.s.green];
+			poly.blue  = byte2float[pSurf->PolyColor.s.blue];
+			poly.alpha = byte2float[pSurf->PolyColor.s.alpha];
 		}
 
-		// Tint color
-		tint.red   = byte2float[pSurf->TintColor.s.red];
-		tint.green = byte2float[pSurf->TintColor.s.green];
-		tint.blue  = byte2float[pSurf->TintColor.s.blue];
-		tint.alpha = byte2float[pSurf->TintColor.s.alpha];
+		// Only if the surface is colormapped
+		if (CurrentPolyFlags & PF_ColorMapped)
+		{
+			tint.red   = byte2float[pSurf->TintColor.s.red];
+			tint.green = byte2float[pSurf->TintColor.s.green];
+			tint.blue  = byte2float[pSurf->TintColor.s.blue];
+			tint.alpha = byte2float[pSurf->TintColor.s.alpha];
 
-		// Fade color
-		fade.red   = byte2float[pSurf->FadeColor.s.red];
-		fade.green = byte2float[pSurf->FadeColor.s.green];
-		fade.blue  = byte2float[pSurf->FadeColor.s.blue];
-		fade.alpha = byte2float[pSurf->FadeColor.s.alpha];
+			fade.red   = byte2float[pSurf->FadeColor.s.red];
+			fade.green = byte2float[pSurf->FadeColor.s.green];
+			fade.blue  = byte2float[pSurf->FadeColor.s.blue];
+			fade.alpha = byte2float[pSurf->FadeColor.s.alpha];
+		}
 	}
 
 	// this test is added for new coronas' code (without depth buffer)
@@ -2141,8 +2193,9 @@ static void PreparePolygon(FSurfaceInfo *pSurf, FOutVector *pOutVerts, FBITFIELD
 		pglColor4ubv(c);
 	}
 
-	Shader_Load(pSurf, &poly, &tint, &fade);
+	Shader_SetUniforms(pSurf, &poly, &tint, &fade);
 }
+
 
 
 // -----------------+
@@ -2189,7 +2242,7 @@ EXPORT void HWRAPI(RenderSkyDome) (gl_sky_t *sky)
 {
 	int i, j;
 
-	Shader_Load(NULL, NULL, NULL, NULL);
+	Shader_SetUniforms(NULL, NULL, NULL, NULL);
 
 	// Build the sky dome! Yes!
 	if (sky->rebuild)
@@ -2290,15 +2343,7 @@ EXPORT void HWRAPI(SetSpecialState) (hwdspecialstate_t IdState, INT32 Value)
 			break;
 
 		case HWD_SET_SHADERS:
-			switch (Value)
-			{
-				case 1:
-					gl_allowshaders = true;
-					break;
-				default:
-					gl_allowshaders = false;
-					break;
-			}
+			gl_allowshaders = (hwdshaderoption_t)Value;
 			break;
 
 		case HWD_SET_TEXTUREFILTERMODE:
@@ -2648,7 +2693,7 @@ static void DrawModelEx(model_t *model, INT32 frameIndex, INT32 duration, INT32 
 	fade.blue  = byte2float[Surface->FadeColor.s.blue];
 	fade.alpha = byte2float[Surface->FadeColor.s.alpha];
 
-	Shader_Load(Surface, &poly, &tint, &fade);
+	Shader_SetUniforms(Surface, &poly, &tint, &fade);
 
 
 
@@ -2904,7 +2949,6 @@ EXPORT INT32  HWRAPI(GetTextureUsed) (void)
 }
 
 
-
 EXPORT void HWRAPI(PostImgRedraw) (float points[SCREENVERTS][SCREENVERTS][2])
 {
 	INT32 x, y;
@@ -2930,6 +2974,7 @@ EXPORT void HWRAPI(PostImgRedraw) (float points[SCREENVERTS][SCREENVERTS][2])
 
 	pglDisable(GL_DEPTH_TEST);
 	pglDisable(GL_BLEND);
+	pglDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
 	// const float blackBack[16]
 
@@ -2939,6 +2984,8 @@ EXPORT void HWRAPI(PostImgRedraw) (float points[SCREENVERTS][SCREENVERTS][2])
 
 	pglVertexPointer(3, GL_FLOAT, 0, blackBack);
 	pglDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+
 
 	pglEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	for(x=0;x<SCREENVERTS-1;x++)

@@ -18,6 +18,12 @@
 #include "p_local.h"
 #include "r_state.h"
 
+extern consvar_t cv_fpscap;
+
+UINT32 R_GetFramerateCap(void);
+boolean R_UsingFrameInterpolation(void);
+
+
 enum viewcontext_e
 {
 	VIEWCONTEXT_PLAYER1 = 0,
@@ -45,6 +51,7 @@ typedef struct {
 	fixed_t y;
 	fixed_t z;
 	angle_t angle;
+	fixed_t scale;
 } interpmobjstate_t;
 
 // Level interpolators
@@ -100,7 +107,7 @@ extern viewvars_t *newview;
 void R_InterpolateView(player_t *player, boolean skybox, fixed_t frac);
 void R_UpdateViewInterpolation(void);
 void R_SetViewContext(enum viewcontext_e _viewcontext);
-void R_ResetViewInterpolation(void);
+void R_ResetViewInterpolation(UINT8 p);
 void R_InterpolateMobjState(mobj_t *mobj, fixed_t frac, interpmobjstate_t *out);
 void R_InterpolatePrecipMobjState(precipmobj_t *mobj, fixed_t frac, interpmobjstate_t *out);
 

@@ -21,9 +21,76 @@
 #include "r_state.h"
 #ifdef POLYOBJECTS
 #include "p_polyobj.h"
-#endif 
+#endif
 #include "z_zone.h"
 #include "hardware/hw_main.h" //cv_grshearing
+#include "d_net.h" //MAXSPLITSCREENPLAYERS
+#include "hardware/hw_main.h" //cv_grshearing
+
+
+static CV_PossibleValue_t fpscap_cons_t[] = {
+	{-1, "Match refresh rate"},
+	{0, "Unlimited"},
+#ifdef DEVELOP
+	// Lower values are actually pretty useful for debugging interp problems!
+	{1, "One Singular Frame"},
+	{10, "10"},
+	{20, "20"},
+	{25, "25"},
+	{30, "30"},
+#endif
+	{35, "35"},
+	{50, "50"},
+	{60, "60"},
+	{70, "70"},
+	{75, "75"},
+	{90, "90"},
+	{100, "100"},
+	{120, "120"},
+	{144, "144"},
+	{165, "165"},
+	{200, "200"},
+	{240, "240"},
+	{300, "300"},
+	{0, NULL}
+};
+ // Sadly, I haven't been able to get individual cap values to work properly :(
+
+consvar_t cv_fpscap = {"fpscap", "Match refresh rate", CV_SAVE, fpscap_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
+
+
+
+UINT32 R_GetFramerateCap(void)
+{
+
+	if (rendermode == render_none)
+	{
+		// If we're not rendering (dedicated server),
+		// we shouldn't be using any interpolation.
+		return TICRATE;
+	}
+
+	if (cv_fpscap.value < 0)
+	{
+		return I_GetRefreshRate();
+	}
+
+	return cv_fpscap.value;
+}
+
+
+boolean R_UsingFrameInterpolation(void)
+{
+
+	if (rendermode == render_none)
+	{
+		// If we're not rendering (dedicated server),
+		// we shouldn't be using any interpolation.
+		return TICRATE;
+	}
+
+	return (R_GetFramerateCap() != TICRATE || cv_timescale.value < FRACUNIT);
+}
 
 static viewvars_t p1view_old;
 static viewvars_t p1view_new;
@@ -46,7 +113,7 @@ static size_t levelinterpolators_len;
 static size_t levelinterpolators_size;
 
 
-static boolean oldview_valid = false;
+static int oldview_invalid[MAXSPLITSCREENPLAYERS] = {0, 0};
 
 static mobj_t **interpolated_mobjs = NULL;
 static size_t interpolated_mobjs_len = 0;
@@ -87,6 +154,7 @@ void R_InterpolateView(player_t *player, boolean skybox, fixed_t frac)
 {
 	viewvars_t* prevview = oldview;
 	INT32 dy = 0;
+	UINT8 i;
 
 	if (FIXED_TO_FLOAT(frac) < 0)
 		frac = 0;
@@ -94,8 +162,18 @@ void R_InterpolateView(player_t *player, boolean skybox, fixed_t frac)
 		frac = FRACUNIT;
 
 
-    
-    if (oldview_valid == false)
+
+
+	if (viewcontext == VIEWCONTEXT_SKY1 || viewcontext == VIEWCONTEXT_PLAYER1)
+	{
+		i = 0;
+	}
+	else
+	{
+		i = 1;
+	}
+
+	if (oldview_invalid[i] != 0)
 	{
 		// interpolate from newview to newview
 		prevview = newview;
@@ -150,12 +228,25 @@ void R_UpdateViewInterpolation(void)
 	p2view_old = p2view_new;
 	sky1view_old = sky1view_new;
 	sky2view_old = sky2view_new;
-	oldview_valid = true;
+	if (oldview_invalid[0] > 0) oldview_invalid[0]--;
+	if (oldview_invalid[1] > 0) oldview_invalid[1]--;
 }
 
-void R_ResetViewInterpolation(void)
+
+void R_ResetViewInterpolation(UINT8 p)
 {
-	oldview_valid = false;
+	if (p == 0)
+	{
+		UINT8 i;
+		for (i = 0; i < MAXSPLITSCREENPLAYERS; i++)
+		{
+			oldview_invalid[i]++;
+		}
+	}
+	else
+	{
+		oldview_invalid[p - 1]++;
+	}
 }
 
 
@@ -193,10 +284,27 @@ void R_SetViewContext(enum viewcontext_e _viewcontext)
 
 void R_InterpolateMobjState(mobj_t *mobj, fixed_t frac, interpmobjstate_t *out)
 {
+	if (frac == FRACUNIT)
+	{
+		out->x = mobj->x;
+		out->y = mobj->y;
+		out->z = mobj->z;
+		out->scale = mobj->scale;
+		out->angle = mobj->angle;
+		return;
+	}
 	out->x =  R_LerpFixed(mobj->old_x, mobj->x, frac);
 	out->y =  R_LerpFixed(mobj->old_y, mobj->y, frac);
 	out->z =  R_LerpFixed(mobj->old_z, mobj->z, frac);
-	out->angle = R_LerpAngle(mobj->old_angle, mobj->angle, frac);
+	out->angle = mobj->resetinterp ? mobj->angle : R_LerpAngle(mobj->old_angle, mobj->angle, frac);
+	if (mobj->scale == mobj->old_scale) // Tiny optimisation - scale is usually unchanging, so let's skip a lerp
+	{
+		out->scale = mobj->scale;
+	}
+	else
+	{
+		out->scale = R_LerpFixed(mobj->old_scale, mobj->scale, frac);
+	}
 }
 
 void R_InterpolatePrecipMobjState(precipmobj_t *mobj, fixed_t frac, interpmobjstate_t *out)
@@ -243,7 +351,7 @@ void R_RemoveMobjInterpolator(mobj_t *mobj)
 
 	if (interpolated_mobjs_len == 0) return;
 
-	for (i = 0; i < interpolated_mobjs_len - 1; i++)
+	for (i = 0; i < interpolated_mobjs_len; i++)
 	{
 		if (interpolated_mobjs[i] == mobj)
 		{
@@ -258,8 +366,6 @@ void R_RemoveMobjInterpolator(mobj_t *mobj)
 
 void R_InitMobjInterpolators(void)
 {
-	// apparently it's not acceptable to free something already unallocated
-	// Z_Free(interpolated_mobjs);
 	interpolated_mobjs = NULL;
 	interpolated_mobjs_len = 0;
 	interpolated_mobjs_capacity = 0;
@@ -282,15 +388,18 @@ void R_UpdateMobjInterpolators(void)
 // Reset the rendering interpolation state of the mobj.
 //
 void R_ResetMobjInterpolationState(mobj_t *mobj)
-{   
+{
 	mobj->old_x2 = mobj->old_x;
 	mobj->old_y2 = mobj->old_y;
 	mobj->old_z2 = mobj->old_z;
 	mobj->old_angle2 = mobj->old_angle;
+	mobj->old_scale2 = mobj->old_scale;
 	mobj->old_x = mobj->x;
 	mobj->old_y = mobj->y;
 	mobj->old_z = mobj->z;
 	mobj->old_angle = mobj->angle;
+	mobj->old_scale = mobj->scale;
+	mobj->resetinterp = false;
 }
 
 //
@@ -322,7 +431,7 @@ static void AddInterpolator(levelinterpolator_t* interpolator)
 		{
 			levelinterpolators_size *= 2;
 		}
-		
+
 		levelinterpolators = Z_ReallocAlign(
 			(void*) levelinterpolators,
 			sizeof(levelinterpolator_t*) * levelinterpolators_size,
@@ -484,19 +593,19 @@ void R_UpdateLevelInterpolators(void)
 	for (i = 0; i < levelinterpolators_len; i++)
 	{
 		levelinterpolator_t *interp = levelinterpolators[i];
-		
+
 		UpdateLevelInterpolatorState(interp);
 	}
 }
 
 void R_ClearLevelInterpolatorState(thinker_t *thinker)
 {
-	
+
 	size_t i;
 	for (i = 0; i < levelinterpolators_len; i++)
 	{
 		levelinterpolator_t *interp = levelinterpolators[i];
-		
+
 		if (interp->thinker == thinker)
 		{
 			// Do it twice to make the old state match the new
@@ -568,7 +677,7 @@ void R_RestoreLevelInterpolators(void)
 	for (i = 0; i < levelinterpolators_len; i++)
 	{
 		levelinterpolator_t *interp = levelinterpolators[i];
-		
+
 		switch (interp->type)
 		{
 		case LVLINTERP_SectorPlane:
@@ -623,7 +732,7 @@ void R_DestroyLevelInterpolators(thinker_t *thinker)
 	for (i = 0; i < levelinterpolators_len; i++)
 	{
 		levelinterpolator_t *interp = levelinterpolators[i];
-		
+
 		if (interp->thinker == thinker)
 		{
 			// Swap the tail of the level interpolators to this spot
@@ -634,4 +743,4 @@ void R_DestroyLevelInterpolators(thinker_t *thinker)
 			i -= 1;
 		}
 	}
-}	
+}

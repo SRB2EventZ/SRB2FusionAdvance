@@ -126,8 +126,6 @@ lighttable_t *scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
 lighttable_t *scalelightfixed[MAXLIGHTSCALE];
 lighttable_t *zlight[LIGHTLEVELS][MAXLIGHTZ]; 
 
-// Uncapped Framerate
-tic_t prev_tics;
 
 
 // Hack to support extra boom colormaps.
@@ -178,8 +176,6 @@ consvar_t cv_homremoval = {"homremoval", "No", CV_SAVE, homremoval_cons_t, NULL,
 
 consvar_t cv_maxportals = {"maxportals", "2", CV_SAVE, maxportals_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL}; 
 
-// Uncapped framerate
-consvar_t cv_frameinterpolation = {"frameinterpolation", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 
 
 
@@ -249,28 +245,29 @@ static void FlipCam2_OnChange(void)
 	SendWeaponPref2();
 }
 
-
+//
+// R_OldPointOnSide
+// Traverse BSP (sub) tree,
+// check point against partition plane.
+// Returns side 0 (front) or 1 (back).
+//
 // killough 5/2/98: reformatted
-INT32 R_PointOnSegSide(fixed_t x, fixed_t y, seg_t *restrict line)
+//
+PUREFUNC INT32 R_OldPointOnSide(fixed_t x, fixed_t y, const node_t *restrict node)
 {
-	fixed_t lx = line->v1->x;
-	fixed_t ly = line->v1->y;
-	fixed_t ldx = line->v2->x - lx;
-	fixed_t ldy = line->v2->y - ly;
+	if (!node->dx)
+		return x <= node->x ? node->dy > 0 : node->dy < 0;
 
-	if (!ldx)
-		return x <= lx ? ldy > 0 : ldy < 0;
+	if (!node->dy)
+		return y <= node->y ? node->dx < 0 : node->dx > 0;
 
-	if (!ldy)
-		return y <= ly ? ldx < 0 : ldx > 0;
-
-	x -= lx;
-	y -= ly;
+	x -= node->x;
+	y -= node->y;
 
 	// Try to quickly decide by looking at sign bits.
-	INT32 mask = (ldy ^ ldx ^ x ^ y) >> 31;
-	return (mask & ((ldy ^ x) < 0)) |	// (left is negative)
-		(~mask & (FixedMul(y, ldx>>FRACBITS) >= FixedMul(ldy>>FRACBITS, x)));
+	INT32 mask = (node->dy ^ node->dx ^ x ^ y) >> 31;
+	return (mask & ((node->dy ^ x) < 0)) |	// (left is negative)
+		(~mask & (FixedMul(y, node->dx>>FRACBITS) >= FixedMul(node->dy>>FRACBITS, x)));
 }
 
 //
@@ -688,6 +685,63 @@ void R_Init(void)
 	framecount = 0;
 }
 
+//
+// R_IsPointInSector
+//
+boolean R_IsPointInSector(sector_t *sector, fixed_t x, fixed_t y)
+{
+	size_t i;
+	size_t passes = 0;
+
+	for (i = 0; i < sector->linecount; i++)
+	{
+		line_t *line = sector->lines[i];
+		vertex_t *v1, *v2;
+
+		if (line->frontsector == line->backsector)
+			continue;
+
+		v1 = line->v1;
+		v2 = line->v2;
+
+		// make sure v1 is below v2
+		if (v1->y > v2->y)
+		{
+			vertex_t *tmp = v1;
+			v1 = v2;
+			v2 = tmp;
+		}
+		else if (v1->y == v2->y)
+			// horizontal line, we can't match this
+			continue;
+
+		if (v1->y < y && y <= v2->y)
+		{
+			// if the y axis in inside the line, find the point where we intersect on the x axis...
+			fixed_t vx = v1->x + (INT64)(v2->x - v1->x) * (y - v1->y) / (v2->y - v1->y);
+
+			// ...and if that point is to the left of the point, count it as inside.
+			if (vx < x)
+				passes++;
+		}
+	}
+
+	// and odd number of passes means we're inside the polygon.
+	return passes % 2;
+}
+
+//
+// R_OldPointInSubsector
+//
+subsector_t *R_OldPointInSubsector(fixed_t x, fixed_t y)
+{
+	size_t nodenum = numnodes-1;
+
+	while (!(nodenum & NF_SUBSECTOR))
+		nodenum = nodes[nodenum].children[R_OldPointOnSide(x, y, nodes+nodenum)];
+
+	return &subsectors[nodenum & ~NF_SUBSECTOR];
+}
 
 //
 // R_IsPointInSubsector, same as above but returns 0 if not in subsector
@@ -714,7 +768,6 @@ subsector_t *R_IsPointInSubsector(fixed_t x, fixed_t y)
 
 	ret = &subsectors[nodenum & ~NF_SUBSECTOR];
 	for (i = 0; i < ret->numlines; i++)
-		//if (R_PointOnSegSide(x, y, &segs[ret->firstline + i])) -- breaks in ogl because polyvertex_t cast over vertex pointers
 		if (P_PointOnLineSide(x, y, segs[ret->firstline + i].linedef) != segs[ret->firstline + i].side)
 			return 0;
 
@@ -724,11 +777,6 @@ subsector_t *R_IsPointInSubsector(fixed_t x, fixed_t y)
 //
 // R_SetupFrame
 //
-
-
-
-
-
 void R_SetupFrame(player_t *player, boolean skybox)
 {
 	camera_t *thiscam;
@@ -740,12 +788,22 @@ void R_SetupFrame(player_t *player, boolean skybox)
 		R_SetViewContext(VIEWCONTEXT_PLAYER2);
 		thiscam = &camera2;
 		chasecam = (cv_chasecam2.value != 0);
+		if (thiscam->reset)
+		{
+			R_ResetViewInterpolation(2);
+			thiscam->reset = false;
+		}
 	}
 	else
 	{
 		R_SetViewContext(VIEWCONTEXT_PLAYER1);
 		thiscam = &camera;
 		chasecam = (cv_chasecam.value != 0);
+		if (thiscam->reset)
+		{
+			R_ResetViewInterpolation(1);
+			thiscam->reset = false;
+		}
 	}
 
 	if (player->climbing || (player->pflags & PF_NIGHTSMODE) || player->playerstate == PST_DEAD)
@@ -821,7 +879,7 @@ void R_SetupFrame(player_t *player, boolean skybox)
 		if (thiscam->subsector)
 			newview->sector = thiscam->subsector->sector;
 		else
-			newview->sector = R_PointInSubsector(viewx, viewy)->sector;
+			newview->sector = R_PointInSubsector(newview->x, newview->y)->sector;
 	}
 	else
 	{
@@ -833,13 +891,13 @@ void R_SetupFrame(player_t *player, boolean skybox)
 		if (r_viewmobj->subsector)
 			newview->sector = r_viewmobj->subsector->sector;
 		else
-			newview->sector = R_PointInSubsector(viewx, viewy)->sector;
+			newview->sector = R_PointInSubsector(newview->x, newview->y)->sector;
 	}
 
 	//newview->sin = FINESINE(viewangle>>ANGLETOFINESHIFT);
-	//viewcos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
+	//newview->cos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
 
-	R_InterpolateView(player, false, cv_frameinterpolation.value == 1 ? rendertimefrac : FRACUNIT);
+	R_InterpolateView(player, false, R_UsingFrameInterpolation() ? rendertimefrac : FRACUNIT);
 }
 
 void R_SkyboxFrame(player_t *player)
@@ -962,13 +1020,12 @@ void R_SkyboxFrame(player_t *player)
 					angle_t ang = r_viewmobj->angle>>ANGLETOFINESHIFT;
 					newview->x += FixedMul(x,FINECOSINE(ang)) - FixedMul(y,  FINESINE(ang));
 					newview->y += FixedMul(x,  FINESINE(ang)) + FixedMul(y,FINECOSINE(ang));
-
 				}
 			}
 			if (mh->skybox_scalez > 0)
-				newview->z += player->awayviewmobj->z / mh->skybox_scalez;
+				newview->z += (player->awayviewmobj->z + 20*FRACUNIT) / mh->skybox_scalez;
 			else if (mh->skybox_scalez < 0)
-				newview->z += player->awayviewmobj->z * -mh->skybox_scalez;
+				newview->z += (player->awayviewmobj->z + 20*FRACUNIT) * -mh->skybox_scalez;
 		}
 		else if (thiscam->chase)
 		{
@@ -1018,9 +1075,9 @@ void R_SkyboxFrame(player_t *player)
 				}
 			}
 			if (mh->skybox_scalez > 0)
-				newview->z += thiscam->z / mh->skybox_scalez;
+				newview->z += (thiscam->z + (thiscam->height>>1)) / mh->skybox_scalez;
 			else if (mh->skybox_scalez < 0)
-				newview->z += thiscam->z * -mh->skybox_scalez;
+				newview->z += (thiscam->z + (thiscam->height>>1)) * -mh->skybox_scalez;
 		}
 		else
 		{
@@ -1028,33 +1085,32 @@ void R_SkyboxFrame(player_t *player)
 			{
 				fixed_t x = 0, y = 0;
 				if (mh->skybox_scalex > 0)
-					x += (player->mo->x - skyboxmo[1]->x) / mh->skybox_scalex;
+					x = (player->mo->x - skyboxmo[1]->x) / mh->skybox_scalex;
 				else if (mh->skybox_scalex < 0)
-					x += (player->mo->x - skyboxmo[1]->x) * -mh->skybox_scalex;
+					x = (player->mo->x - skyboxmo[1]->x) * -mh->skybox_scalex;
 				if (mh->skybox_scaley > 0)
-					y += (player->mo->y - skyboxmo[1]->y) / mh->skybox_scaley;
+					y = (player->mo->y - skyboxmo[1]->y) / mh->skybox_scaley;
 				else if (mh->skybox_scaley < 0)
-					y += (player->mo->y - skyboxmo[1]->y) * -mh->skybox_scaley;
+					y = (player->mo->y - skyboxmo[1]->y) * -mh->skybox_scaley;
 
 				if (r_viewmobj->angle == 0)
 				{
-					newview->x -= y;
-					newview->y += x;
-
+					newview->x  += x;
+					newview->y += y;
 				}
 				else if (r_viewmobj->angle == ANGLE_90)
 				{
-					newview->x += y;
-					newview->y -= x;
+					newview->x  -= y;
+					newview->y += x;
 				}
 				else if (r_viewmobj->angle == ANGLE_180)
 				{
-					newview->x += y;
-					newview->y -= x;
+					newview->x  -= x;
+					newview->y -= y;
 				}
 				else if (r_viewmobj->angle == ANGLE_270)
 				{
-					newview->x += y;
+					newview->x  += y;
 					newview->y -= x;
 				}
 				else
@@ -1074,17 +1130,17 @@ void R_SkyboxFrame(player_t *player)
 	if (r_viewmobj->subsector)
 		newview->sector = r_viewmobj->subsector->sector;
 	else
-		newview->sector = R_PointInSubsector(viewx, viewy)->sector;
+		newview->sector = R_PointInSubsector(newview->x, newview->y)->sector;
 
-	//viewsin = FINESINE(viewangle>>ANGLETOFINESHIFT);
-	//viewcos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
+	//newview->sin = FINESINE(viewangle>>ANGLETOFINESHIFT);
+	//newview->cos = FINECOSINE(viewangle>>ANGLETOFINESHIFT);
 
-	R_InterpolateView(player, true, cv_frameinterpolation.value == 1 ? rendertimefrac : FRACUNIT);
+	R_InterpolateView(player, true, R_UsingFrameInterpolation() ? rendertimefrac : FRACUNIT);
 
 }
 
 
-boolean R_IsViewpointThirdPerson(player_t *player, boolean skybox)
+boolean R_IsViewpointFirstPerson(player_t *player, boolean skybox)
 {
 	boolean chasecam = false;
 	if (splitscreen && player == &players[secondarydisplayplayer] && player != &players[consoleplayer])
@@ -1419,5 +1475,5 @@ void R_RegisterEngineStuff(void)
 	// initialized to standard viewheight
 	CV_RegisterVar(&cv_viewheight); 
 	// Uncapped
-	CV_RegisterVar(&cv_frameinterpolation);
+	CV_RegisterVar(&cv_fpscap);
 }

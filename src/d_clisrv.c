@@ -17,6 +17,8 @@
 #include <unistd.h> //for unlink
 #endif
 
+#include "i_time.h"
+#include "i_time.h"
 #include "i_net.h"
 #include "i_system.h"
 #include "i_video.h"
@@ -44,7 +46,7 @@
 #include "lzf.h"
 #include "lua_script.h"
 #include "lua_hook.h"
-#include "md5.h" 
+#include "md5.h"
 #include "r_fps.h"
 
 #ifdef CLIENT_LOADINGSCREEN
@@ -122,6 +124,12 @@ UINT8 hu_resynching = 0;
 UINT8 hu_redownloadinggamestate = 0;
 
 static boolean can_receive_gamestate[MAXNETNODES];
+
+
+
+
+// true when a player is connecting or disconnecting so that the gameplay has stopped in its tracks
+boolean hu_stopped = false;
 
 UINT8 adminpassmd5[16];
 boolean adminpasswordset = false;
@@ -1757,7 +1765,7 @@ void CL_UpdateServerList(boolean internetsearch, INT32 room)
 
 	if (internetsearch)
 	{
-		const msg_server_t *server_list;
+		const msg_ext_server_t *server_list;
 		INT32 i = -1;
 		server_list = GetShortServersList(room);
 		if (server_list)
@@ -1779,7 +1787,7 @@ void CL_UpdateServerList(boolean internetsearch, INT32 room)
 				{
 					INT32 node = I_NetMakeNodewPort(server_list[i].ip, server_list[i].port);
 					if (node == -1)
-						break; // no more node free
+						continue; // no more node free, or resolution failure
 					SendAskInfo(node, true);
 					// Force close the connection so that servers can't eat
 					// up nodes forever if we never get a reply back from them
@@ -2052,7 +2060,10 @@ static boolean CL_ServerConnectionTicker(boolean viams, const char *tmpsave, tic
 #endif
 	}
 	else
-		I_Sleep();
+	{
+		I_Sleep(cv_sleep.value);
+		I_UpdateTime(cv_timescale.value);
+	}
 
 	return true;
 }
@@ -2447,28 +2458,31 @@ static void CL_RemovePlayer(INT32 playernum, INT32 reason)
 	// the remaining players.
 	if (G_IsSpecialStage(gamemap))
 	{
-		INT32 i, count, increment, rings;
+		INT32 count = 0;
 
-		for (i = 0, count = 0; i < MAXPLAYERS; i++)
+		for (INT32 i = 0; i < MAXPLAYERS; i++)
 		{
 			if (playeringame[i])
 				count++;
 		}
 
 		count--;
-		rings = players[playernum].health - 1;
-		increment = rings/count;
-
-		for (i = 0; i < MAXPLAYERS; i++)
+		if(count > 0)
 		{
-			if (playeringame[i] && i != playernum)
-			{
-				if (rings < increment)
-					P_GivePlayerRings(&players[i], rings);
-				else
-					P_GivePlayerRings(&players[i], increment);
+			INT32 rings = players[playernum].health - 1;
+			INT32 increment = rings/count;
 
-				rings -= increment;
+			for (INT32 i = 0; i < MAXPLAYERS; i++)
+			{
+				if (playeringame[i] && i != playernum)
+				{
+					if (rings < increment)
+						P_GivePlayerRings(&players[i], rings);
+					else
+						P_GivePlayerRings(&players[i], increment);
+
+					rings -= increment;
+				}
 			}
 		}
 	}
@@ -4799,8 +4813,11 @@ static void SV_Maketic(void)
 	maketic++;
 }
 
-void TryRunTics(tic_t realtics)
+
+boolean TryRunTics(tic_t realtics)
 {
+	boolean ticking;
+
 	// the machine has lagged but it is not so bad
 	if (realtics > TICRATE/7) // FIXME: consistency failure!!
 	{
@@ -4824,7 +4841,7 @@ void TryRunTics(tic_t realtics)
 
 	if (demoplayback)
 	{
-		neededtic = gametic + (realtics * cv_playbackspeed.value);
+		neededtic = gametic + realtics;
 		// start a game after a demo
 		maketic += realtics;
 		firstticstosend = maketic;
@@ -4844,10 +4861,23 @@ void TryRunTics(tic_t realtics)
 	}
 #endif
 
-	if (player_joining)
-		return;
+	ticking = neededtic > gametic;
 
-	if (neededtic > gametic)
+	if (ticking)
+	{
+		if (realtics)
+			hu_stopped = false;
+	}
+
+	if (player_joining)
+	{
+		if (realtics)
+			hu_stopped = true;
+		return false;
+	}
+
+
+	if (ticking)
 	{
 		if (advancedemo)
 			D_StartTitle();
@@ -4855,15 +4885,20 @@ void TryRunTics(tic_t realtics)
 			// run the count * tics
 			while (neededtic > gametic)
 			{
-				DEBFILE(va("============ Running tic %d (local %d)\n", gametic, localgametic)); 
+				DEBFILE(va("============ Running tic %d (local %d)\n", gametic, localgametic));
 
-				prev_tics = I_GetTime();
 				G_Ticker((gametic % NEWTICRATERATIO) == 0);
 				ExtraDataTicker();
 				gametic++;
 				consistancy[gametic%BACKUPTICS] = Consistancy();
 			}
 	}
+	else
+	{
+		if (realtics)
+			hu_stopped = true;
+	}
+	return ticking;
 }
 
 #ifdef NEWPING

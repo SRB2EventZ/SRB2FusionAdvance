@@ -150,12 +150,41 @@ static const char *const mobj_opt[] = {
 #endif
 	NULL};
 
+static int mobj_fields_ref = LUA_NOREF;
+
+enum mapthing_e {
+	mapthing_valid,
+	mapthing_x,
+	mapthing_y,
+	mapthing_angle,
+	mapthing_type,
+	mapthing_options,
+	mapthing_z,
+	mapthing_extrainfo,
+	mapthing_mobj,
+};
+
+static const char *const mapthing_opt[] = {
+	"valid",
+	"x",
+	"y",
+	"angle",
+	"type",
+	"options",
+	"z",
+	"extrainfo",
+	"mobj",
+	NULL,
+};
+
+static int mapthing_fields_ref = LUA_NOREF;
+
 #define UNIMPLEMENTED luaL_error(L, LUA_QL("mobj_t") " field " LUA_QS " is not implemented for Lua and cannot be accessed.", mobj_opt[field])
 
 static int mobj_get(lua_State *L)
 {
 	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	enum mobj_e field = Lua_optoption(L, 2, NULL, mobj_opt);
+	enum mobj_e field = Lua_optoption(L, 2, -1, mobj_fields_ref);
 	lua_settop(L, 2);
 
 	if (!mo) {
@@ -375,11 +404,11 @@ static int mobj_get(lua_State *L)
 }
 
 #define NOSET luaL_error(L, LUA_QL("mobj_t") " field " LUA_QS " should not be set directly.", mobj_opt[field])
-#define NOSETPOS luaL_error(L, LUA_QL("mobj_t") " field " LUA_QS " should not be set directly. Use " LUA_QL("P_Move") ", " LUA_QL("P_TryMove") ", or " LUA_QL("P_TeleportMove") " instead.", mobj_opt[field])
+#define NOSETPOS luaL_error(L, LUA_QL("mobj_t") " field " LUA_QS " should not be set directly. Use " LUA_QL("P_Move") ", " LUA_QL("P_TryMove") ", or " LUA_QL("P_SetOrigin") ", or " LUA_QL("P_MoveOrigin") " instead.", mobj_opt[field])
 static int mobj_set(lua_State *L)
 {
 	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	enum mobj_e field = Lua_optoption(L, 2, mobj_opt[0], mobj_opt);
+	enum mobj_e field = Lua_optoption(L, 2, mobj_valid, mobj_fields_ref);
 	lua_settop(L, 3);
 
 	if (!mo)
@@ -622,6 +651,7 @@ static int mobj_set(lua_State *L)
 			scale = FRACUNIT/100;
 		mo->destscale = scale;
 		P_SetScale(mo, scale);
+		mo->old_scale = scale;
 		break;
 	}
 	case mobj_destscale:
@@ -682,11 +712,12 @@ static int mobj_set(lua_State *L)
 static int mapthing_get(lua_State *L)
 {
 	mapthing_t *mt = *((mapthing_t **)luaL_checkudata(L, 1, META_MAPTHING));
-	const char *field = luaL_checkstring(L, 2);
-	lua_Integer number;
+	enum mapthing_e field = Lua_optoption(L, 2, -1, mapthing_fields_ref);
+	INT32 number;
+	lua_settop(L, 2);
 
 	if (!mt) {
-		if (fastcmp(field,"valid")) {
+		if (field == mapthing_valid) {
 			lua_pushboolean(L, false);
 			return 1;
 		}
@@ -695,30 +726,40 @@ static int mapthing_get(lua_State *L)
 		return 0;
 	}
 
-	if (fastcmp(field,"valid")) {
+	switch (field)
+	{
+	case mapthing_valid:
 		lua_pushboolean(L, true);
 		return 1;
-	} else if(fastcmp(field,"x"))
+	case mapthing_x:
 		number = mt->x;
-	else if(fastcmp(field,"y"))
+		break;
+	case mapthing_y:
 		number = mt->y;
-	else if(fastcmp(field,"angle"))
+		break;
+	case mapthing_angle:
 		number = mt->angle;
-	else if(fastcmp(field,"type"))
+		break;
+	case mapthing_type:
 		number = mt->type;
-	else if(fastcmp(field,"options"))
+		break;
+	case mapthing_options:
 		number = mt->options;
-	else if(fastcmp(field,"z"))
+		break;
+	case mapthing_z:
 		number = mt->z;
-	else if(fastcmp(field,"extrainfo"))
+		break;
+	case mapthing_extrainfo:
 		number = mt->extrainfo;
-	else if(fastcmp(field,"mobj")) {
+		break;
+	case mapthing_mobj:
 		LUA_PushUserdata(L, mt->mobj, META_MOBJ);
 		return 1;
-	} else if (devparm)
-		return luaL_error(L, LUA_QL("mapthing_t") " has no field named " LUA_QS, field);
-	else
+	default:
+		if (devparm)
+			return luaL_error(L, LUA_QL("mapthing_t") " has no field named " LUA_QS, luaL_checkstring(L, 2));
 		return 0;
+	}
 
 	lua_pushinteger(L, number);
 	return 1;
@@ -727,7 +768,8 @@ static int mapthing_get(lua_State *L)
 static int mapthing_set(lua_State *L)
 {
 	mapthing_t *mt = *((mapthing_t **)luaL_checkudata(L, 1, META_MAPTHING));
-	const char *field = luaL_checkstring(L, 2);
+	enum mapthing_e field = Lua_optoption(L, 2, -1, mapthing_fields_ref);
+	lua_settop(L, 3);
 
 	if (!mt)
 		return luaL_error(L, "accessed mapthing_t doesn't exist anymore.");
@@ -735,24 +777,35 @@ static int mapthing_set(lua_State *L)
 	if (hud_running)
 		return luaL_error(L, "Do not alter mapthing_t in HUD rendering code!");
 
-	if(fastcmp(field,"x"))
+	switch (field)
+	{
+	case mapthing_x:
 		mt->x = (INT16)luaL_checkinteger(L, 3);
-	else if(fastcmp(field,"y"))
+		break;
+	case mapthing_y:
 		mt->y = (INT16)luaL_checkinteger(L, 3);
-	else if(fastcmp(field,"angle"))
+		break;
+	case mapthing_angle:
 		mt->angle = (INT16)luaL_checkinteger(L, 3);
-	else if(fastcmp(field,"type"))
+		break;
+	case mapthing_type:
 		mt->type = (UINT16)luaL_checkinteger(L, 3);
-	else if(fastcmp(field,"options"))
+		break;
+	case mapthing_options:
 		mt->options = (UINT16)luaL_checkinteger(L, 3);
-	else if(fastcmp(field,"z"))
+		break;
+	case mapthing_z:
 		mt->z = (INT16)luaL_checkinteger(L, 3);
-	else if(fastcmp(field,"extrainfo"))
+		break;
+	case mapthing_extrainfo:
 		mt->extrainfo = (UINT8)luaL_checkinteger(L, 3);
-	else if(fastcmp(field,"mobj"))
+		break;
+	case mapthing_mobj:
 		mt->mobj = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
-	else
-		return luaL_error(L, LUA_QL("mapthing_t") " has no field named " LUA_QS, field);
+		break;
+	default:
+		return luaL_error(L, LUA_QL("mapthing_t") " has no field named " LUA_QS, luaL_checkstring(L, 2));
+	}
 
 	return 0;
 }
@@ -813,6 +866,8 @@ int LUA_MobjLib(lua_State *L)
 		lua_setfield(L, -2, "__newindex");
 	lua_pop(L,1);
 
+	mobj_fields_ref = Lua_CreateFieldTable(L, mobj_opt);
+
 	luaL_newmetatable(L, META_MAPTHING);
 		lua_pushcfunction(L, mapthing_get);
 		lua_setfield(L, -2, "__index");
@@ -820,6 +875,8 @@ int LUA_MobjLib(lua_State *L)
 		lua_pushcfunction(L, mapthing_set);
 		lua_setfield(L, -2, "__newindex");
 	lua_pop(L,1);
+
+	mapthing_fields_ref = Lua_CreateFieldTable(L, mapthing_opt);
 
 	lua_newuserdata(L, 0);
 		lua_createtable(L, 0, 2);

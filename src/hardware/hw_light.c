@@ -1045,7 +1045,7 @@ void HWR_DL_AddLight(gr_vissprite_t *spr, GLPatch_t *patch)
 	// uncapped/interpolation
 	interpmobjstate_t interp = {0};
 
-	if (cv_frameinterpolation.value == 1)
+	if (R_UsingFrameInterpolation())
 	{
 		R_InterpolateMobjState(spr->mobj, rendertimefrac, &interp);
 	}
@@ -1096,7 +1096,7 @@ void HWR_InitLight(void)
 	for (i = 0;i < NUMLIGHTS;i++)
 		lspr[i].dynamic_sqrradius = lspr[i].dynamic_radius*lspr[i].dynamic_radius;
 
-	lightmappatch.mipmap.downloaded = false;
+	lightmappatch.mipmap->downloaded = false;
 	coronalumpnum = W_CheckNumForName("CORONA");
 }
 
@@ -1107,10 +1107,10 @@ static void HWR_SetLight(void)
 {
 	int    i, j;
 
-	if (!lightmappatch.mipmap.downloaded && !lightmappatch.mipmap.grInfo.data)
+	if (!lightmappatch.mipmap->downloaded && !lightmappatch.mipmap->grInfo.data)
 	{
 
-		UINT16 *Data = Z_Malloc(129*128*sizeof (UINT16), PU_HWRCACHE, &lightmappatch.mipmap.grInfo.data);
+		UINT16 *Data = Z_Malloc(129*128*sizeof (UINT16), PU_HWRCACHE, &lightmappatch.mipmap->grInfo.data);
 
 		for (i = 0; i < 128; i++)
 		{
@@ -1123,21 +1123,21 @@ static void HWR_SetLight(void)
 					Data[i*128+j] = 0;
 			}
 		}
-		lightmappatch.mipmap.grInfo.format = GR_TEXFMT_ALPHA_INTENSITY_88;
+		lightmappatch.mipmap->grInfo.format = GR_TEXFMT_ALPHA_INTENSITY_88;
 
 		lightmappatch.width = 128;
 		lightmappatch.height = 128;
-		lightmappatch.mipmap.width = 128;
-		lightmappatch.mipmap.height = 128;
-		lightmappatch.mipmap.grInfo.smallLodLog2 = GR_LOD_LOG2_128;
-		lightmappatch.mipmap.grInfo.largeLodLog2 = GR_LOD_LOG2_128;
-		lightmappatch.mipmap.grInfo.aspectRatioLog2 = GR_ASPECT_LOG2_1x1;
-		lightmappatch.mipmap.flags = 0; //TF_WRAPXY; // DEBUG: view the overdraw !
+		lightmappatch.mipmap->width = 128;
+		lightmappatch.mipmap->height = 128;
+		lightmappatch.mipmap->grInfo.smallLodLog2 = GR_LOD_LOG2_128;
+		lightmappatch.mipmap->grInfo.largeLodLog2 = GR_LOD_LOG2_128;
+		lightmappatch.mipmap->grInfo.aspectRatioLog2 = GR_ASPECT_LOG2_1x1;
+		lightmappatch.mipmap->flags = 0; //TF_WRAPXY; // DEBUG: view the overdraw !
 	}
-	HWD.pfnSetTexture(&lightmappatch.mipmap);
+	HWD.pfnSetTexture(lightmappatch.mipmap);
 
 	// The system-memory data can be purged now.
-	Z_ChangeTag(lightmappatch.mipmap.grInfo.data, PU_HWRCACHE_UNLOCKED);
+	Z_ChangeTag(lightmappatch.mipmap->grInfo.data, PU_HWRCACHE_UNLOCKED);
 }
 
 //**********************************************************

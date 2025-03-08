@@ -896,7 +896,7 @@ fixed_t P_MobjFloorZ(mobj_t *mobj, sector_t *sector, sector_t *boundsec, fixed_t
 		testy += y;
 
 		// If the highest point is in the sector, then we have it easy! Just get the Z at that point
-		if (R_PointInSubsector(testx, testy)->sector == (boundsec ? boundsec : sector))
+		if (R_IsPointInSector(boundsec ? boundsec : sector, testx, testy))
 			return P_GetZAt(slope, testx, testy);
 
 		// If boundsec is set, we're looking for specials. In that case, iterate over every line in this sector to find the TRUE highest/lowest point
@@ -984,7 +984,7 @@ fixed_t P_MobjCeilingZ(mobj_t *mobj, sector_t *sector, sector_t *boundsec, fixed
 		testy += y;
 
 		// If the highest point is in the sector, then we have it easy! Just get the Z at that point
-		if (R_PointInSubsector(testx, testy)->sector == (boundsec ? boundsec : sector))
+		if (R_IsPointInSector(boundsec ? boundsec : sector, testx, testy))
 			return P_GetZAt(slope, testx, testy);
 
 		// If boundsec is set, we're looking for specials. In that case, iterate over every line in this sector to find the TRUE highest/lowest point
@@ -4466,7 +4466,7 @@ static void P_Boss4MoveSpikeballs(mobj_t *mobj, angle_t angle, fixed_t fz)
 	while ((base = base->tracer))
 	{
 		for (seg = base, dist = 172*FRACUNIT, s = 9; seg; seg = seg->hnext, dist += 124*FRACUNIT, --s)
-			P_TeleportMove(seg, mobj->x + P_ReturnThrustX(mobj, angle, dist), mobj->y + P_ReturnThrustY(mobj, angle, dist), bz + FixedMul(fz, FixedDiv(s<<FRACBITS, 9<<FRACBITS)));
+			P_MoveOrigin(seg, mobj->x + P_ReturnThrustX(mobj, angle, dist), mobj->y + P_ReturnThrustY(mobj, angle, dist), bz + FixedMul(fz, FixedDiv(s<<FRACBITS, 9<<FRACBITS)));
 		angle += ANGLE_MAX/3;
 	}
 }
@@ -5212,7 +5212,7 @@ static void P_Boss9Thinker(mobj_t *mobj)
 			if (mobj->health > 3) {
 				mobj->tracer->destscale = FRACUNIT + (4*TICRATE - mobj->fuse)*(FRACUNIT/2)/TICRATE + FixedMul(FINECOSINE(angle>>ANGLETOFINESHIFT),FRACUNIT/2);
 				P_SetScale(mobj->tracer, mobj->tracer->destscale);
-				P_TeleportMove(mobj->tracer, mobj->x, mobj->y, mobj->z + mobj->height/2 - mobj->tracer->height/2);
+				P_SetOrigin(mobj->tracer, mobj->x, mobj->y, mobj->z + mobj->height/2 - mobj->tracer->height/2);
 				mobj->tracer->momx = mobj->momx;
 				mobj->tracer->momy = mobj->momy;
 				mobj->tracer->momz = mobj->momz;
@@ -6195,11 +6195,6 @@ void P_MobjThinker(mobj_t *mobj)
 	I_Assert(mobj != NULL);
 	I_Assert(!P_MobjWasRemoved(mobj)); 
 
-
-
-
-
-
 	if (mobj->flags & MF_NOTHINK)
 		return;
 
@@ -6810,7 +6805,7 @@ void P_MobjThinker(mobj_t *mobj)
 				P_RemoveMobj(mobj);
 				return;
 			}
-			P_TeleportMove(mobj, mobj->target->x, mobj->target->y, mobj->target->z - mobj->height);
+			P_MoveOrigin(mobj, mobj->target->x, mobj->target->y, mobj->target->z - mobj->height);
 			break;
 		case MT_HAMMER:
 			if (mobj->z <= mobj->floorz)
@@ -7086,6 +7081,8 @@ void P_MobjThinker(mobj_t *mobj)
 		case MT_BLUETEAMRING:
 			// No need to check water. Who cares?
 			P_RingThinker(mobj);
+			if (P_MobjWasRemoved(mobj))
+				return;
 			if (mobj->flags2 & MF2_NIGHTSPULL)
 				P_NightsItemChase(mobj);
 			else
@@ -7678,8 +7675,6 @@ mobj_t *P_SpawnMobj(fixed_t x, fixed_t y, fixed_t z, mobjtype_t type)
 	mobj->x = x;
 	mobj->y = y;
 
-    
-	
 	
 	mobj->radius = info->radius;
 	mobj->height = info->height;
@@ -7734,6 +7729,8 @@ mobj_t *P_SpawnMobj(fixed_t x, fixed_t y, fixed_t z, mobjtype_t type)
 
 	// Tells MobjCheckWater that the water height was not set.
 	mobj->watertop = INT32_MAX;
+
+	mobj->resetinterp = true;
 
 	if (z == ONFLOORZ)
 	{
@@ -8087,15 +8084,6 @@ void P_RemoveMobj(mobj_t *mobj)
 #endif
 		P_RemoveThinker((thinker_t *)mobj);
 	}
-}
-
-// This does not need to be added to Lua.
-// To test it in Lua, check mobj.valid
-boolean P_MobjWasRemoved(mobj_t *mobj)
-{
-	if (mobj && mobj->thinker.function.acp1 == (actionf_p1)P_MobjThinker)
-		return false;
-	return true;
 }
 
 void P_RemovePrecipMobj(precipmobj_t *mobj)
