@@ -2266,7 +2266,7 @@ static void ST_overlayDrawer(void)
 		}
 	}
 
-	if ((cv_showinput.value && !players[displayplayer].spectator) || modeattacking)
+	if (!splitscreen && ((cv_showinput.value && !players[displayplayer].spectator) || modeattacking))
 		ST_drawInput();
 
 	ST_drawDebugInfo();
