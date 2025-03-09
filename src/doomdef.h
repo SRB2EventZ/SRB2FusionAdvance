@@ -178,7 +178,7 @@ extern FILE *logstream;
 #define UPDATE_ALERT
 
 // If you maintain a fork of srb2-legacy, change this.
-#define RELEASES "github.com/P-AS/srb2-legacy/releases\n"
+#define RELEASES "github.com/SRB2EventZ/SRB2FusionAdvance/releases\n"
 
 // The string used in the alert that pops up in the event of an update being available.
 // Please change to apply to your modification (we don't want everyone asking where your mod is on SRB2.org!).
@@ -381,7 +381,7 @@ void CONS_Debug(INT32 debugflags, const char *fmt, ...) FUNCDEBUG;
 
 // Things that used to be in dstrings.h
 #define SAVEGAMENAME "srb2sav"
-extern char savegamename[256];
+extern char savegamename[512];
 
 // m_misc.h
 #ifdef GETTEXT
