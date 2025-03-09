@@ -135,6 +135,7 @@ static UINT8** translationtablecache[MAXSKINS + 4] = {NULL};
 
 // See also the enum skincolors_t
 // TODO Callum: Can this be translated?
+/*
 const char *Color_Names[MAXSKINCOLORS] =
 {
 	"None",      // SKINCOLOR_NONE
@@ -194,7 +195,7 @@ const UINT8 Color_Opposite[MAXSKINCOLORS*2] =
 	SKINCOLOR_NONE,8,   // SKINCOLOR_YELLOW
 	SKINCOLOR_NONE,8    // SKINCOLOR_GOLD
 };
-
+*/
 CV_PossibleValue_t Color_cons_t[MAXSKINCOLORS+1];
 
 /**	\brief The R_InitTranslationTables
@@ -234,6 +235,8 @@ void R_InitTranslationTables(void)
 
 	\return	void
 */
+
+/*
 static void R_GenerateTranslationColormap(UINT8 *dest_colormap, INT32 skinnum, UINT8 color)
 {
 	// Table of indices into the palette of the first entries of each translated ramp
@@ -502,6 +505,7 @@ static void R_GenerateTranslationColormap(UINT8 *dest_colormap, INT32 skinnum, U
 		break;
 	}
 }
+*/
 
 
 /**	\brief	Retrieves a translation colormap from the cache.
@@ -567,6 +571,7 @@ void R_FlushTranslationColormapCache(void)
 			memset(translationtablecache[i], 0, MAXTRANSLATIONS * sizeof(UINT8**));
 }
 
+/*
 UINT8 R_GetColorByName(const char *name)
 {
 	UINT8 color = (UINT8)atoi(name);
@@ -577,7 +582,7 @@ UINT8 R_GetColorByName(const char *name)
 			return color;
 	return 0;
 }
-
+*/
 // ==========================================================================
 //               COMMON DRAWER FOR 8 AND 16 BIT COLOR MODES
 // ==========================================================================
