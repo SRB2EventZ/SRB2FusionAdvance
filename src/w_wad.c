@@ -790,12 +790,8 @@ UINT16 W_InitFile(const char *filename)
 	numwadfiles++; // must come BEFORE W_LoadDehackedLumps, so any addfile called by COM_BufInsertText called by Lua doesn't overwrite what we just loaded
 
 #ifdef HWRENDER
-	// Read shaders from file
-	if (rendermode == render_opengl)
-	{
-		HWR_LoadCustomShadersFromFile(numwadfiles - 1, (type == RET_PK3));
-		HWR_CompileShaders();
-	}
+if(rendermode == render_opengl)
+	HWR_LoadCustomShadersFromFile(numwadfiles - 1, (type == RET_PK3));
 #endif // HWRENDER
 
 	// TODO: HACK ALERT - Load Lua & SOC stuff right here. I feel like this should be out of this place, but... Let's stick with this for now.
@@ -1773,8 +1769,6 @@ int W_VerifyNMUSlumps(const char *filename)
 		{"M_", 2}, // As does menu stuff
 		{"SHADERS", 7}, // OpenGL shader definitions
 		{"SH_", 3}, // GLSL shader
-	
-
 		{NULL, 0},
 	};
 	return W_VerifyFile(filename, NMUSlist, false);
