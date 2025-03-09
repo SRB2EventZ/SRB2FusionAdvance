@@ -3341,8 +3341,6 @@ void P_SetSaveGameName(const char* gamedataPrefix, const char* savedataPrefix)
 	snprintf(gamedatafilename, sizeof(gamedatafilename) - 1, "%s/%s/%s.dat", srb2home, savefolder, gamedataPrefix);
 	snprintf(savegamename, sizeof(savegamename) - 1, "%s/%s/%s%%u.ssg", srb2home, savefolder, savedataPrefix);
 
-	CONS_Printf("%s\n%s\n%s\n", gamedatafilename, timeattackfolder, savegamename);
-
 	// Attempt to copy files from root if we don't have a gamedata
 	FILE* f = fopen(gamedatafilename, "rb");
 	if(!f)
@@ -3355,8 +3353,8 @@ void P_SetSaveGameName(const char* gamedataPrefix, const char* savedataPrefix)
 		{
 			fclose(f);
 			rename(buffer, gamedatafilename);
+			CONS_Alert(CONS_NOTICE, "Game data %s has been moved to %s.\n", buffer, gamedatafilename);
 		}
-		
 
 		// Now repeat for saves
 		for(int slot = 0; slot < (MAXSAVEGAMES - 1); slot++)
@@ -3368,6 +3366,7 @@ void P_SetSaveGameName(const char* gamedataPrefix, const char* savedataPrefix)
 				snprintf(buffer2, sizeof(buffer2) - 1, "%s/%s/%s%u.ssg", srb2home, savefolder, savedataPrefix, slot);
 				fclose(f);
 				rename(buffer, buffer2);
+				CONS_Alert(CONS_NOTICE, "Save file %s has been moved to %s.\n", buffer, buffer2);
 			}
 		}
 	}
