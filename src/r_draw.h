@@ -112,7 +112,6 @@ UINT8* R_GetTranslationColormap(INT32 skinnum, skincolors_t color, UINT8 flags);
 void R_GenerateTranslationColormap(UINT8 *dest_colormap, INT32 skinnum, UINT8 color);
 void R_FlushTranslationColormapCache(void);
 UINT8 R_GetColorByName(const char *name);
-extern UINT8 colortranslations[MAXTRANSLATIONS][16];
 
 // Custom player skin translation
 void R_InitViewBuffer(INT32 width, INT32 height);

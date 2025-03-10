@@ -57,7 +57,6 @@ r_segs.c
 r_sky.c
 r_splats.c
 r_things.c
-r_translations.c
 screen.c
 v_video.c
 s_sound.c

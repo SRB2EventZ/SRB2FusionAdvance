@@ -918,9 +918,9 @@ static menuitem_t MP_SplitServerMenu[] =
 
 static menuitem_t MP_PlayerSetupMenu[] =
 {
-	{IT_KEYHANDLER | IT_WHITESTRING,   NULL, "Name",   M_HandleSetupMultiPlayer,   8},
-	{IT_KEYHANDLER | IT_WHITESTRING,   NULL, "Character",  M_HandleSetupMultiPlayer,  40},
-	{IT_KEYHANDLER | IT_WHITESTRING,   NULL, "Color", M_HandleSetupMultiPlayer,  122}, // Tails 01-18-2001
+	{IT_KEYHANDLER | IT_STRING,   NULL, "Your name",   M_HandleSetupMultiPlayer,   0},
+	{IT_KEYHANDLER | IT_STRING,   NULL, "Your color",  M_HandleSetupMultiPlayer,  16},
+	{IT_KEYHANDLER | IT_STRING,   NULL, "Your player", M_HandleSetupMultiPlayer,  96}, // Tails 01-18-2001
 };
 
 // ------------------------------------
@@ -1728,7 +1728,7 @@ menu_t MP_PlayerSetupDef =
 	&MP_MainDef,
 	MP_PlayerSetupMenu,
 	M_DrawSetupMultiPlayerMenu,
-	32, 16,
+	27, 40,
 	0,
 	M_QuitMultiPlayerMenu
 };
@@ -7323,48 +7323,23 @@ static void M_DrawSetupMultiPlayerMenu(void)
 	M_DrawGenericMenu();
 
 	// draw name string
-	M_DrawTextBox(mx - 4, my + 12,/* MAXPLAYERNAME*/ 32, 1);
-	V_DrawString(mx + 8, my + 20, V_ALLOWLOWERCASE, setupm_name);
+	M_DrawTextBox(mx + 90, my - 8, MAXPLAYERNAME, 1);
+	V_DrawString(mx + 98, my, V_ALLOWLOWERCASE, setupm_name);
 
 	// draw skin string
-	V_DrawRightAlignedString(mx + 264, my + 40,
+	V_DrawString(mx + 90, my + 96,
 		((MP_PlayerSetupMenu[2].status & IT_TYPE) == IT_SPACE ? V_TRANSLUCENT : 0)|V_YELLOWMAP|V_ALLOWLOWERCASE,
 		skins[setupm_fakeskin].realname);
 
 	// draw the name of the color you have chosen
 	// Just so people don't go thinking that "Default" is Green.
-	V_DrawRightAlignedString(296, 138, V_YELLOWMAP|V_ALLOWLOWERCASE, Color_Names[setupm_fakecolor]);
+	V_DrawString(208, 72, V_YELLOWMAP|V_ALLOWLOWERCASE, Color_Names[setupm_fakecolor]);
 
 	// draw text cursor for name
 	if (!itemOn && skullAnimCounter < 4) // blink cursor
-		V_DrawCharacter(mx + 8 + V_StringWidth(setupm_name, 0), my + 20, '_', false);
+		V_DrawCharacter(mx + 98 + V_StringWidth(setupm_name, 0), my, '_', false);
 
-	// 2.2 color bar code ported from Kart
-#define charw 74
-#define indexwidth 8
-	{
-		const INT32 colwidth = (278-charw)/(2*indexwidth);
-		INT32 i = -colwidth;
-		INT16 col = setupm_fakecolor - colwidth;
-		INT32 x = mx-3;
-		INT32 w = indexwidth;
-		UINT8 h;
 
-		while (col < 1)
-			col += MAXSKINCOLORS-1;
-		while (i <= colwidth)
-		{
-			if (!(i++))
-				w = charw;
-			else
-				w = indexwidth;
-			for (h = 0; h < 16; h++)
-				V_DrawFill(x, my+132+h, w, 1, colortranslations[col][h]);
-			if (++col >= MAXSKINCOLORS)
-				col -= MAXSKINCOLORS-1;
-			x += w;
-		}
-	}
 
 	// anim the player in the box
 	multi_tics -= renderdeltatics;
@@ -7400,7 +7375,7 @@ static void M_DrawSetupMultiPlayerMenu(void)
 		flags |= V_FLIP; // This sprite is left/right flipped!
 
 	// draw box around guy
-	M_DrawTextBox(mx + 90, my + 44, PLBOXW, PLBOXH);
+	M_DrawTextBox(mx + 90, my + 8, PLBOXW, PLBOXH);
 
 	// draw player sprite
 	if (!setupm_fakecolor) // should never happen but hey, who knows
@@ -7408,12 +7383,12 @@ static void M_DrawSetupMultiPlayerMenu(void)
 		if (skins[setupm_fakeskin].flags & SF_HIRES)
 		{
 			V_DrawSciencePatch((mx + 98 + (PLBOXW * 8 / 2)) << FRACBITS,
-				(my + 52 + (PLBOXH * 8) - 12) << FRACBITS,
+				(my + 16 + (PLBOXH * 8) - 12) << FRACBITS,
 				flags, patch,
 				skins[setupm_fakeskin].highresscale);
 		}
 		else
-			V_DrawScaledPatch(mx + 98 + (PLBOXW * 8 / 2), my + 8 + (PLBOXH * 8) - 12, flags, patch);
+			V_DrawScaledPatch(mx + 98 + (PLBOXW * 8 / 2), my + 16 + (PLBOXH * 8) - 12, flags, patch);
 	}
 	else
 	{
@@ -7422,16 +7397,15 @@ static void M_DrawSetupMultiPlayerMenu(void)
 		if (skins[setupm_fakeskin].flags & SF_HIRES)
 		{
 			V_DrawFixedPatch((mx + 98 + (PLBOXW * 8 / 2)) << FRACBITS,
-				(my + 52 + (PLBOXH * 8) - 12) << FRACBITS,
+				(my + 16 + (PLBOXH * 8) - 12) << FRACBITS,
 				skins[setupm_fakeskin].highresscale,
 				flags, patch, colormap);
 		}
 		else
-			V_DrawMappedPatch(mx + 98 + (PLBOXW * 8 / 2), my + 52 + (PLBOXH * 8) - 12, flags, patch, colormap);
+			V_DrawMappedPatch(mx + 98 + (PLBOXW * 8 / 2), my + 16 + (PLBOXH * 8) - 12, flags, patch, colormap);
 
 		Z_Free(colormap);
 	}
-#undef charw
 }
 
 // Handle 1P/2P MP Setup
@@ -7453,12 +7427,12 @@ static void M_HandleSetupMultiPlayer(INT32 choice)
 		break;
 
 	case KEY_LEFTARROW:
-		if (itemOn == 1)       //player skin
+		if (itemOn == 2)       //player skin
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakeskin--;
 		}
-		else if (itemOn == 2) // player color
+		else if (itemOn == 1) // player color
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakecolor--;
@@ -7466,12 +7440,12 @@ static void M_HandleSetupMultiPlayer(INT32 choice)
 		break;
 
 	case KEY_RIGHTARROW:
-		if (itemOn == 1)       //player skin
+		if (itemOn == 2)       //player skin
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakeskin++;
 		}
-		else if (itemOn == 2) // player color
+		else if (itemOn == 1) // player color
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakecolor++;
