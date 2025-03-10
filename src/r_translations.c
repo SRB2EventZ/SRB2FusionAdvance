@@ -8,12 +8,8 @@
 // terms of the GNU General Public License, version 2.
 // See the 'LICENSE' file for more details.
 //-----------------------------------------------------------------------------
-/// \file  r_draw.c
-/// \brief span / column drawer functions, for 8bpp and 16bpp
-///        All drawing to the view buffer is accomplished in this file.
-///        The other refresh files only know about ccordinates,
-///        not the architecture of the frame buffer.
-///        The frame buffer is a linear one, and we need only the base address.
+/// \file  r_translation.c
+/// \brief Translation table handling
 
 #include "doomdef.h"
 #include "r_draw.h"
