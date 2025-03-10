@@ -46,7 +46,7 @@
 #include "lua_hook.h"
 #include "b_bot.h"
 #include "m_cond.h" // condition sets
-#include "md5.h" // demo checksums
+#include "md5.h" // demo checksums 
 #include "r_fps.h" // Uncapped
 
 
@@ -64,9 +64,8 @@ JoyType_t Joystick2;
 // 1024 bytes is plenty for a savegame
 #define SAVEGAMESIZE (1024)
 
-char gamedatafilename[512] = "gamedata.dat";
+char gamedatafilename[64] = "gamedata.dat";
 char timeattackfolder[64] = "main";
-char savefolder[64] = "saves";
 char customversionstring[32] = "\0";
 
 static void G_DoCompleted(void);
@@ -3509,7 +3508,7 @@ void G_LoadGame(UINT32 slot, INT16 mapoverride)
 {
 	size_t length;
 	char vcheck[VERSIONSIZE];
-	char savename[260];
+	char savename[255];
 
 	// memset savedata to all 0, fixes calling perfectly valid saves corrupt because of bots
 	memset(&savedata, 0, sizeof(savedata));
@@ -3596,7 +3595,7 @@ void G_LoadGame(UINT32 slot, INT16 mapoverride)
 void G_SaveGame(UINT32 savegameslot)
 {
 	boolean saved;
-	char savename[260] = "";
+	char savename[256] = "";
 	const char *backup;
 
 	sprintf(savename, savegamename, savegameslot);
@@ -5832,3 +5831,4 @@ INT32 G_TicsToMilliseconds(tic_t tics)
 {
 	return (INT32)((tics%TICRATE) * (1000.00f/TICRATE));
 }
+

@@ -33,7 +33,6 @@
 #include "lua_script.h"
 #include "lua_hook.h"
 #include "d_clisrv.h"
-#include "p_saveg.h"
 
 #include "m_cond.h"
 
@@ -3087,22 +3086,24 @@ static void readmaincfg(MYFILE *f)
 
 				G_SaveGameData();
 				DEH_WriteUndoline(word, gamedatafilename, UNDO_NONE);
+				strlcpy(gamedatafilename, word2, sizeof (gamedatafilename));
+				strlwr(gamedatafilename);
 				savemoddata = true;
 
 				// Also save a time attack folder
 
-				filenamelen = strlen(word2);  // Strip off the extension
+				filenamelen = strlen(gamedatafilename);  // Strip off the extension
 				if (filenamelen >= 4)
 					filenamelen -= 4;
 				if (filenamelen >= sizeof(timeattackfolder))
 					filenamelen = sizeof(timeattackfolder)-1;
-				char tmpfilename[sizeof(timeattackfolder)];
-				strncpy(tmpfilename, word2, filenamelen);
-				tmpfilename[min(filenamelen, sizeof (timeattackfolder) - 1)] = '\0';
-				strlwr(tmpfilename);
-				strncpy(timeattackfolder, tmpfilename, sizeof(timeattackfolder));
+				strncpy(timeattackfolder, gamedatafilename, filenamelen);
+				timeattackfolder[min(filenamelen, sizeof (timeattackfolder) - 1)] = '\0';
 
-				P_SetSaveGameName(tmpfilename, tmpfilename);
+				strcpy(savegamename, timeattackfolder);
+				strlcat(savegamename, "%u.ssg", sizeof(savegamename));
+				// can't use sprintf since there is %u in savegamename
+				strcatbf(savegamename, srb2home, PATHSEP);
 
 				gamedataadded = true;
 			}

@@ -141,7 +141,7 @@ boolean advancedemo;
 INT32 debugload = 0;
 #endif
 
-char savegamename[512];
+char savegamename[256];
 
 #ifdef _arch_dreamcast
 char srb2home[256] = "/cd";
@@ -1079,10 +1079,8 @@ void D_SRB2Main(void)
 		CONS_Printf(M_GetText("Development mode ON.\n"));
 
 	// default savegame
-	if(M_CheckParm("-savedir") && M_IsNextParm())
-	{
-		snprintf(savefolder, sizeof(savefolder) - 1, "%s/", M_GetNextParm());
-	}
+	strcpy(savegamename, SAVEGAMENAME"%u.ssg");
+
 	{
 		const char *userhome = D_Home(); //Alam: path to home
 
@@ -1113,6 +1111,8 @@ void D_SRB2Main(void)
 			else
 				snprintf(configfile, sizeof configfile, "%s" PATHSEP CONFIGFILENAME, srb2home);
 
+			// can't use sprintf since there is %u in savegamename
+			strcatbf(savegamename, srb2home, PATHSEP);
 
 #else
 			snprintf(srb2home, sizeof srb2home, "%s", userhome);
@@ -1121,11 +1121,13 @@ void D_SRB2Main(void)
 				snprintf(configfile, sizeof configfile, "%s" PATHSEP "d"CONFIGFILENAME, userhome);
 			else
 				snprintf(configfile, sizeof configfile, "%s" PATHSEP CONFIGFILENAME, userhome);
+
+			// can't use sprintf since there is %u in savegamename
+			strcatbf(savegamename, userhome, PATHSEP);
 #endif
 		}
 
 		configfile[sizeof configfile - 1] = '\0';
-		P_SetSaveGameName("gamedata", SAVEGAMENAME);
 
 #ifdef _arch_dreamcast
 	strcpy(downloaddir, "/ram"); // the dreamcast's TMP
