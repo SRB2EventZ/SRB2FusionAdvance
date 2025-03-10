@@ -261,9 +261,7 @@ void P_RemoveThinkerDelayed(void *pthinker)
 //
 void P_RemoveThinker(thinker_t *thinker)
 {
-#ifdef HAVE_BLUA
 	LUA_InvalidateUserdata(thinker);
-#endif
 	thinker->function.acp1 = P_RemoveThinkerDelayed;
 }
 
@@ -653,9 +651,7 @@ void P_Ticker(boolean run)
 			if (playeringame[i] && players[i].mo && !P_MobjWasRemoved(players[i].mo))
 				P_PlayerAfterThink(&players[i]);
 
-#ifdef HAVE_BLUA
 		LUAh_ThinkFrame();
-#endif
 	}
 
 	// Run shield positioning
@@ -807,9 +803,7 @@ void P_PreTicker(INT32 frames)
 			if (playeringame[i] && players[i].mo && !P_MobjWasRemoved(players[i].mo))
 				P_PlayerAfterThink(&players[i]);
 
-#ifdef HAVE_BLUA
 		LUAh_ThinkFrame();
-#endif
 
 		// Run shield positioning
 		P_RunShields();

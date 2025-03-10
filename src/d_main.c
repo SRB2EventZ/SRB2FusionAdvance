@@ -102,9 +102,7 @@ int	snprintf(char *str, size_t n, const char *fmt, ...);
 #include "hardware/hw3sound.h"
 #endif
 
-#ifdef HAVE_BLUA
 #include "lua_script.h"
-#endif
 
 // platform independant focus loss
 UINT8 window_notinfocus = false;

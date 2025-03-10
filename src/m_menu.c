@@ -2533,7 +2533,6 @@ boolean M_Responder(event_t *ev)
 				//make sure the game doesn't still think we're in a netgame.
 				if (!Playing() && netgame && multiplayer)
 				{
-					MSCloseUDPSocket();		// Clean up so we can re-open the connection later.
 					netgame = false;
 					multiplayer = false;
 				}
@@ -4564,11 +4563,9 @@ static void M_HandleAddons(INT32 choice)
 							M_AddonExec(KEY_ENTER);
 							break;
 						case EXT_LUA:
-#ifndef HAVE_BLUA
 							S_StartSound(NULL, sfx_lose);
 							M_StartMessage(va("%c%s\x80\nThis copy of SRB2 was compiled\nwithout support for .lua files.\n\n(Press a key)\n", ('\x80' + (highlightflags>>V_CHARCOLORSHIFT)), dirmenu[dir_on[menudepthleft]]+DIR_STRING),NULL,MM_NOTHING);
 							break;
-#endif
 						// else intentional fallthrough
 						case EXT_SOC:
 						case EXT_WAD:

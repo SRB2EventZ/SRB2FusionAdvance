@@ -2379,9 +2379,7 @@ void G_SpawnPlayer(INT32 playernum, boolean starpost)
 	if (starpost) //Don't even bother with looking for a place to spawn.
 	{
 		P_MovePlayerToStarpost(playernum);
-#ifdef HAVE_BLUA
 		LUAh_PlayerSpawn(&players[playernum]); // Lua hook for player spawning :)
-#endif
 		return;
 	}
 
@@ -2431,9 +2429,7 @@ void G_SpawnPlayer(INT32 playernum, boolean starpost)
 	}
 	P_MovePlayerToSpawn(playernum, spawnpoint);
 
-#ifdef HAVE_BLUA
 	LUAh_PlayerSpawn(&players[playernum]); // Lua hook for player spawning :)
-#endif
 
 }
 
@@ -2649,9 +2645,7 @@ void G_DoReborn(INT32 playernum)
 		}
 		else
 		{
-#ifdef HAVE_BLUA
 			LUAh_MapChange(gamemap);
-#endif
 			G_DoLoadLevel(true);
 		}
 	}
@@ -5258,9 +5252,7 @@ void G_DoPlayDemo(char *defdemoname)
 	// didn't start recording right away.
 	demo_start = false;
 
-#ifdef HAVE_BLUA
 	LUAh_MapChange(gamemap);
-#endif
 	displayplayer = consoleplayer = 0;
 	memset(playeringame,0,sizeof(playeringame));
 	playeringame[0] = true;
