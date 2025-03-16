@@ -496,7 +496,7 @@ static void HWR_RenderPlane(sector_t *sector, extrasubsector_t *xsub, boolean is
 	static FOutVector *planeVerts = NULL;
 	static UINT16 numAllocedPlaneVerts = 0;
 
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 
 	
 
@@ -866,7 +866,7 @@ static void HWR_AddTransparentWall(FOutVector *wallVerts, FSurfaceInfo *pSurf, I
 //
 static void HWR_ProjectWall(FOutVector *wallVerts, FSurfaceInfo *pSurf, FBITFIELD blendmode, INT32 lightlevel, extracolormap_t *wallcolormap)
 {
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 
 	HWR_Lighting(pSurf, lightlevel, wallcolormap);
 
@@ -2843,7 +2843,7 @@ static void HWR_RenderPolyObjectPlane(polyobj_t *polysector, boolean isceiling, 
 {
 	FSurfaceInfo Surf;
 	FOutVector *v3d;
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 
 	size_t nrPlaneVerts = polysector->numVertices;
 	INT32 i;
@@ -3728,7 +3728,7 @@ static void HWR_DrawSpriteShadow(gr_vissprite_t *spr, GLPatch_t *gpatch, float t
 	pslope_t *floorslope;
 	fixed_t slopez;
 	FBITFIELD blendmode = PF_Translucent|PF_Modulated|PF_Clip;
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 
 	R_GetShadowZ(spr->mobj, &floorslope);
 
@@ -3940,7 +3940,7 @@ static void HWR_DrawSpriteShadow(gr_vissprite_t *spr, GLPatch_t *gpatch, float t
 		sSurf.PolyColor.s.alpha = (UINT8)(sSurf.PolyColor.s.alpha - floorheight/4);
 		if (HWR_UseShader())
 		{
-			shader = SHADER_FLOOR;
+			shader = SHADER_NONE;
 			blendmode |= PF_ColorMapped;
 		}	
 		HWR_ProcessPolygon(&sSurf, swallVerts, 4, blendmode, shader, false);
@@ -4005,7 +4005,7 @@ static void HWR_SplitSprite(gr_vissprite_t *spr)
 	extracolormap_t *colormap;
 	FUINT lightlevel;
 	FBITFIELD blend = 0;
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 	UINT8 alpha;
 	INT32 i;
 	float realtop, realbot, top, bot;
@@ -4280,7 +4280,7 @@ static void HWR_DrawSprite(gr_vissprite_t *spr)
 	GLPatch_t *gpatch; // sprite patch converted to hardware
 	FSurfaceInfo Surf;
 	const boolean hires = (spr->mobj && spr->mobj->skin && ((skin_t *)spr->mobj->skin)->flags & SF_HIRES);
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 
 	if (spr->mobj)
 		this_scale = FIXED_TO_FLOAT(spr->mobj->scale);
@@ -4467,7 +4467,7 @@ static void HWR_DrawSprite(gr_vissprite_t *spr)
 // Sprite drawer for precipitation
 static inline void HWR_DrawPrecipitationSprite(gr_vissprite_t *spr)
 {
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 	FBITFIELD blend = 0;
 	FOutVector wallVerts[4];
 	GLPatch_t *gpatch; // sprite patch converted to hardware
@@ -6435,7 +6435,7 @@ void HWR_RenderWall(FOutVector *wallVerts, FSurfaceInfo *pSurf, FBITFIELD blend,
 	FBITFIELD blendmode = blend;
 	UINT8 alpha = pSurf->PolyColor.s.alpha; // retain the alpha
 
-	INT32 shader = -1;
+	INT32 shader = SHADER_NONE;
 
 	// Lighting is done here instead so that fog isn't drawn incorrectly on transparent walls after sorting
 	HWR_Lighting(pSurf, lightlevel, wallcolormap);

@@ -807,6 +807,11 @@ EXPORT void HWRAPI(SetShaderInfo) (hwdshaderinfo_t info, INT32 value)
 EXPORT void HWRAPI(SetShader) (int slot)
 {
 #ifdef GL_SHADERS
+	if (slot == SHADER_NONE)
+	{
+		UnSetShader();
+		return;
+	}
 	if (gl_allowshaders)
 	{
 		gl_shader_t *next_shader = &gl_shaders[slot]; // the gl_shader_t we are going to switch to

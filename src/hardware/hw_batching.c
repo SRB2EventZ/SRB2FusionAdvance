@@ -115,7 +115,7 @@ void HWR_ProcessPolygon(FSurfaceInfo *pSurf, FOutVector *pOutVerts, FUINT iNumPt
 		polygonArray[polygonArraySize].numVerts = iNumPts;
 		polygonArray[polygonArraySize].polyFlags = PolyFlags;
 		polygonArray[polygonArraySize].texture = current_texture;
-		polygonArray[polygonArraySize].shader = (shader_target != -1) ? HWR_GetShaderFromTarget(shader_target) : shader_target;
+		polygonArray[polygonArraySize].shader = (shader_target != SHADER_NONE) ? HWR_GetShaderFromTarget(shader_target) : shader_target;
 		polygonArray[polygonArraySize].horizonSpecial = horizonSpecial;
 		// default to polygonArraySize so we don't lose order on horizon lines
 		// (yes, it's supposed to be negative, since we're sorting in that direction)
@@ -152,8 +152,7 @@ void HWR_ProcessPolygon(FSurfaceInfo *pSurf, FOutVector *pOutVerts, FUINT iNumPt
 	}
 	else
 	{
-        if (shader_target != -1)
-            HWD.pfnSetShader(HWR_GetShaderFromTarget(shader_target));
+		HWD.pfnSetShader((shader_target != SHADER_NONE) ? HWR_GetShaderFromTarget(shader_target) : shader_target);
         HWD.pfnDrawPolygon(pSurf, pOutVerts, iNumPts, PolyFlags);
     }
 }
