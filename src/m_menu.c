@@ -46,6 +46,7 @@
 #include "p_local.h"
 #include "p_setup.h"
 #include "f_finale.h"
+#include "snake.h"
 
 #ifdef HWRENDER
 #include "hardware/hw_main.h"
@@ -1333,27 +1334,28 @@ static menuitem_t OP_GameOptionsMenu[] =
 {
 #ifndef NONET
 	{IT_STRING | IT_CVAR | IT_CV_STRING,
-	                      NULL, "Master server",          &cv_masterserver,     10},
-	{IT_STRING | IT_SUBMENU, NULL, "Chat Options...",     &OP_ChatOptionsDef,   40},
+	                      NULL, "Master server",          &cv_masterserver,     5},
+	{IT_STRING | IT_SUBMENU, NULL, "Chat Options...",     &OP_ChatOptionsDef,   20},
 #endif
-	{IT_STRING | IT_CVAR, NULL, "Show HUD",               &cv_showhud,     50},
+	{IT_STRING | IT_CVAR, NULL, "Show HUD",               &cv_showhud,     25},
 	{IT_STRING | IT_CVAR | IT_CV_SLIDER,
-	                      NULL, "HUD Visibility",         &cv_translucenthud, 60},
-	{IT_STRING | IT_CVAR, NULL, "Timer/Rings Display",    &cv_timetic,     70},
-	{IT_STRING | IT_CVAR, NULL, "Score Display",          &cv_scorepos,     80},
-	{IT_STRING | IT_CVAR, NULL, "Always Compact Rankings",          &cv_compactscoreboard,     90},
-	{IT_STRING | IT_CVAR, NULL, "Local ping display",		&cv_showping,			100}, // shows ping next to framerate if we want to.
+	                      NULL, "HUD Visibility",         &cv_translucenthud, 30},
+	{IT_STRING | IT_CVAR, NULL, "Timer/Rings Display",    &cv_timetic,     35},
+	{IT_STRING | IT_CVAR, NULL, "Score Display",          &cv_scorepos,     40},
+	{IT_STRING | IT_CVAR, NULL, "Always Compact Rankings",          &cv_compactscoreboard,     45},
+	{IT_STRING | IT_CVAR, NULL, "Local ping display",		&cv_showping,			50}, // shows ping next to framerate if we want to.
 #ifdef SEENAMES
-	{IT_STRING | IT_CVAR, NULL, "HUD Player Names",       &cv_seenames,    110},
+	{IT_STRING | IT_CVAR, NULL, "HUD Player Names",       &cv_seenames,    55},
 #endif
-	{IT_STRING | IT_CVAR, NULL, "Log Hazard Damage",      &cv_hazardlog,   120},
+	{IT_STRING | IT_CVAR, NULL, "Log Hazard Damage",      &cv_hazardlog,   60},
 
-	{IT_STRING | IT_CVAR, NULL, "Console Back Color",     &cons_backcolor, 130},
-	{IT_STRING | IT_CVAR, NULL, "Console Text Size",      &cv_constextsize,140},
-	{IT_STRING | IT_CVAR, NULL, "Uppercase Console",      &cv_allcaps,     150},
+	{IT_STRING | IT_CVAR, NULL, "Console Back Color",     &cons_backcolor, 65},
+	{IT_STRING | IT_CVAR, NULL, "Console Text Size",      &cv_constextsize, 70},
+	{IT_STRING | IT_CVAR, NULL, "Uppercase Console",      &cv_allcaps,     75},
 
-	{IT_STRING | IT_CVAR, NULL, "Title Screen Demos",     &cv_rollingdemos, 160},
-	{IT_STRING | IT_CVAR, NULL, "Textbox Style",     &cv_textboxstyle, 170},
+	{IT_STRING | IT_CVAR, NULL, "Title Screen Demos",     &cv_rollingdemos, 80},
+	{IT_STRING | IT_CVAR, NULL, "Textbox Style",     &cv_textboxstyle, 85},
+	{IT_STRING | IT_CVAR, NULL, "Snake Minigame",     &cv_snake, 90},
 };
 
 static menuitem_t OP_ChatOptionsMenu[] =
@@ -1770,7 +1772,7 @@ menu_t OP_VideoModeDef =
 };
 menu_t OP_SoundOptionsDef = DEFAULTMENUSTYLE("M_SOUND", OP_SoundOptionsMenu, &OP_MainDef, 60, 30);
 menu_t OP_SoundAdvancedDef = DEFAULTMENUSTYLE("M_SOUND", OP_SoundAdvancedMenu, &OP_SoundOptionsDef, 30, 30);
-menu_t OP_GameOptionsDef = DEFAULTMENUSTYLE("M_GAME", OP_GameOptionsMenu, &OP_MainDef, 30, 30);
+menu_t OP_GameOptionsDef = DEFAULTSCROLLMENUSTYLE("M_GAME", OP_GameOptionsMenu, &OP_MainDef, 30, 30);
 menu_t OP_ServerOptionsDef = DEFAULTMENUSTYLE("M_SERVER", OP_ServerOptionsMenu, &OP_MainDef, 30, 30);
 
 menu_t OP_NetgameOptionsDef = DEFAULTMENUSTYLE("M_SERVER", OP_NetgameOptionsMenu, &OP_ServerOptionsDef, 30, 30);

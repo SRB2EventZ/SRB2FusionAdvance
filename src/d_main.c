@@ -80,6 +80,10 @@ int	snprintf(char *str, size_t n, const char *fmt, ...);
 #include "filesrch.h" // refreshdirmenu, mainwadstally 
 #include "r_fps.h"
 
+#ifdef CLIENT_LOADINGSCREEN
+#include "snake.h"
+#endif
+
 #ifdef CMAKECONFIG
 #include "config.h"
 #else
@@ -1141,6 +1145,9 @@ void D_SRB2Main(void)
 
 	// rand() needs seeded regardless of password
 	srand((unsigned int)time(NULL));
+	rand();
+	rand();
+	rand();
 
 	if (M_CheckParm("-password") && M_IsNextParm())
 		D_SetPassword(M_GetNextParm());
@@ -1351,6 +1358,9 @@ void D_SRB2Main(void)
 
 	CONS_Printf("ST_Init(): Init status bar.\n");
 	ST_Init();
+
+	// Not sure where to put this, but whatever
+	Snake_InitVars();
 
 	if (M_CheckParm("-room"))
 	{

@@ -53,6 +53,7 @@
 // cl loading screen
 #include "v_video.h"
 #include "f_finale.h"
+#include "snake.h"
 #endif
 
 #ifdef _XBOX
@@ -1125,8 +1126,8 @@ static inline void CL_DrawConnectionStatus(void)
 	V_DrawFadeScreen();
 
 	// Draw the bottom box.
-	M_DrawTextBox(BASEVIDWIDTH/2-128-8, BASEVIDHEIGHT-24-8, 32, 1);
-	V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-24-24, V_YELLOWMAP, "Press ESC to abort");
+	M_DrawTextBox(BASEVIDWIDTH/2-128-8, BASEVIDHEIGHT-16-8, 32, 1);
+	V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-16-16, V_YELLOWMAP, "Press ESC to abort");
 
 	if (cl_mode != CL_DOWNLOADFILES)
 	{
@@ -1136,7 +1137,7 @@ static inline void CL_DrawConnectionStatus(void)
 		const char *cltext;
 
 		for (i = 0; i < 16; ++i)
-			V_DrawFill((BASEVIDWIDTH/2-128) + (i * 16), BASEVIDHEIGHT-24, 16, 8, palstart + ((animtime - i) & 15));
+			V_DrawFill((BASEVIDWIDTH/2-128) + (i * 16), BASEVIDHEIGHT-16, 16, 8, palstart + ((animtime - i) & 15));
 
 		switch (cl_mode)
 		{
@@ -1146,9 +1147,9 @@ static inline void CL_DrawConnectionStatus(void)
 				{
 					cltext = M_GetText("Downloading game state...");
 					Net_GetNetStat();
-					V_DrawString(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-24, V_20TRANS|V_MONOSPACE,
+					V_DrawString(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-16, V_20TRANS|V_MONOSPACE,
 						va(" %4uK",fileneeded[lastfilenum].currentsize>>10));
-					V_DrawRightAlignedString(BASEVIDWIDTH/2+128, BASEVIDHEIGHT-24, V_20TRANS|V_MONOSPACE,
+					V_DrawRightAlignedString(BASEVIDWIDTH/2+128, BASEVIDHEIGHT-16, V_20TRANS|V_MONOSPACE,
 						va("%3.1fK/s ", ((double)getbps)/1024));
 				}
 				else
@@ -1163,7 +1164,7 @@ static inline void CL_DrawConnectionStatus(void)
 				cltext = M_GetText("Connecting to server...");
 				break;
 		}
-		V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-24-32, V_YELLOWMAP, cltext);
+		V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-16-24, V_YELLOWMAP, cltext);
 	}
 	else
 	{
@@ -1174,12 +1175,15 @@ static inline void CL_DrawConnectionStatus(void)
 			fileneeded_t *file = &fileneeded[lastfilenum];
 			char *filename = file->filename;
 
+		if(cv_snake.value)
+				Snake_Draw();
+
 			Net_GetNetStat();
 			dldlength = (INT32)((file->currentsize/(double)file->totalsize) * 256);
 			if (dldlength > 256)
 				dldlength = 256;
-			V_DrawFill(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-24, 256, 8, 175);
-			V_DrawFill(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-24, dldlength, 8, 160);
+			V_DrawFill(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-16, 256, 8, 175);
+			V_DrawFill(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-16, dldlength, 8, 160);
 
 			memset(tempname, 0, sizeof(tempname));
 			// offset filename to just the name only part
@@ -1197,15 +1201,15 @@ static inline void CL_DrawConnectionStatus(void)
 				strncpy(tempname, filename, sizeof(tempname)-1);
 			}
 
-			V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-24-32, V_YELLOWMAP,
+			V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-16-24, V_YELLOWMAP,
 				va(M_GetText("Downloading \"%s\""), tempname));
-			V_DrawString(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-24, V_20TRANS|V_MONOSPACE,
+			V_DrawString(BASEVIDWIDTH/2-128, BASEVIDHEIGHT-16, V_20TRANS|V_MONOSPACE,
 				va(" %4uK/%4uK",fileneeded[lastfilenum].currentsize>>10,file->totalsize>>10));
-			V_DrawRightAlignedString(BASEVIDWIDTH/2+128, BASEVIDHEIGHT-24, V_20TRANS|V_MONOSPACE,
+			V_DrawRightAlignedString(BASEVIDWIDTH/2+128, BASEVIDHEIGHT-16, V_20TRANS|V_MONOSPACE,
 				va("%3.1fK/s ", ((double)getbps)/1024));
 		}
 		else
-			V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-24-32, V_YELLOWMAP,
+			V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT-16-24, V_YELLOWMAP,
 				M_GetText("Waiting to download files..."));
 	}
 }
@@ -1840,7 +1844,11 @@ static boolean CL_ServerConnectionSearchTicker(tic_t *asksent)
 				}
 				// no problem if can't send packet, we will retry later
 				if (CL_SendRequestFile())
+				{
 					cl_mode = CL_DOWNLOADFILES;
+					if(cv_snake.value)
+						Snake_Initialise();
+				}
 			}
 		}
 		else
@@ -1902,6 +1910,12 @@ static boolean CL_ServerConnectionTicker(const char *tmpsave, tic_t *oldtic, tic
 			if (waitmore)
 				break; // exit the case
 
+			if (snake)
+			{
+				free(snake);
+				snake = NULL;
+			}
+	
 			cl_mode = CL_ASKJOIN; // don't break case continue to cljoin request now
 			/* FALLTHRU */
 
@@ -1948,19 +1962,25 @@ static boolean CL_ServerConnectionTicker(const char *tmpsave, tic_t *oldtic, tic
 	// Call it only once by tic
 	if (*oldtic != I_GetTime())
 	{
-		INT32 key;
+		
 
 		I_OsPolling();
-		key = I_GetKey();
-		if (key == KEY_ESCAPE || key == KEY_JOY1+1)
+		
+		for (; eventtail != eventhead; eventtail = (eventtail+1) & (MAXEVENTS-1))
+			G_MapEventsToControls(&events[eventtail]);
+
+		if (gamekeydown[KEY_ESCAPE] || gamekeydown[KEY_JOY1+1])
 		{
 			CONS_Printf(M_GetText("Network game synchronization aborted.\n"));
 //				M_StartMessage(M_GetText("Network game synchronization aborted.\n\nPress ESC\n"), NULL, MM_NOTHING);
 			D_QuitNetGame();
 			CL_Reset();
 			D_StartTitle();
+			memset(gamekeydown, 0, NUMKEYS);
 			return false;
 		}
+		else if (cl_mode == CL_DOWNLOADFILES && snake && cv_snake.value)
+			Snake_Handle();
 
 		// why are these here? this is for servers, we're a client
 		//if (key == 's' && server)
@@ -1971,8 +1991,11 @@ static boolean CL_ServerConnectionTicker(const char *tmpsave, tic_t *oldtic, tic
 #ifdef CLIENT_LOADINGSCREEN
 		if (client && cl_mode != CL_CONNECTED && cl_mode != CL_ABORTED)
 		{
+			if ((cl_mode != CL_DOWNLOADFILES && cl_mode != CL_DOWNLOADSAVEGAME) || !cv_snake.value)
+			{
 			F_TitleScreenTicker(true);
 			F_TitleScreenDrawer();
+			}
 			CL_DrawConnectionStatus();
 			I_UpdateNoVsync(); // page flip or blit buffer
 			if (moviemode)
