@@ -55,7 +55,11 @@ if(${SDL2_FOUND})
 	if(${CMAKE_SYSTEM} MATCHES Darwin)
 		set(MACOSX_BUNDLE_ICON_FILE Srb2mac.icns)
 		set_source_files_properties(macosx/Srb2mac.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-		target_sources(SRB2SDL2 PRIVATE macosx/Srb2mac.icns)
+		target_sources(SRB2SDL2 PRIVATE
+			macosx/mac_resources.c
+			macosx/mac_resources.h
+			macosx/Srb2mac.icns
+		)
 	endif()
 
 	if(${CMAKE_SYSTEM} MATCHES Windows)

@@ -133,6 +133,10 @@ typedef LPVOID (WINAPI *p_MapViewOfFile) (HANDLE, DWORD, DWORD, DWORD, SIZE_T);
 #define O_BINARY 0
 #endif
 
+#ifdef __APPLE__
+#include "macosx/mac_resources.h"
+#endif
+
 #ifndef errno
 #include <errno.h>
 #endif
@@ -144,8 +148,6 @@ typedef LPVOID (WINAPI *p_MapViewOfFile) (HANDLE, DWORD, DWORD, DWORD, SIZE_T);
 #include <time.h>
 #define UNIXBACKTRACE
 #endif
-
-
 
 // Locations for searching the srb2.srb
 #if defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON)
@@ -204,7 +206,6 @@ static char returnWadPath[256];
 // query the scheduler granularity. SDL will do what's needed to make this as
 // low as possible though.
 #define MIN_SLEEP_DURATION_MS 2.1
-
 
 /**	\brief	The JoyReset function
 
@@ -3193,42 +3194,4 @@ size_t I_GetFreeMem(size_t *total)
 
 // note CPUAFFINITY code used to reside here
 void I_RegisterSysCommands(void) {}
-#endif
-
-#ifdef __APPLE__
-// formerly from src/sdl/macosx/mac_resources.c
-#include <CoreFoundation/CoreFoundation.h>
-
-void OSX_GetResourcesPath(char * buffer)
-{
-    CFBundleRef mainBundle;
-    mainBundle = CFBundleGetMainBundle();
-    if (mainBundle)
-    {
-        const int BUF_SIZE = 256; // because we somehow always know that
-
-        CFURLRef appUrlRef = CFBundleCopyBundleURL(mainBundle);
-        CFStringRef macPath;
-        if (appUrlRef != NULL)
-            macPath = CFURLCopyFileSystemPath(appUrlRef, kCFURLPOSIXPathStyle);
-        else
-            macPath = NULL;
-
-        const char* rawPath;
-
-        if (macPath != NULL)
-            rawPath = CFStringGetCStringPtr(macPath, kCFStringEncodingASCII);
-        else
-            rawPath = NULL;
-
-        if (rawPath != NULL && (CFStringGetLength(macPath) + strlen("/Contents/Resources") < BUF_SIZE))
-        {
-            strcpy(buffer, rawPath);
-            strcat(buffer, "/Contents/Resources");
-        }
-
-        CFRelease(macPath);
-        CFRelease(appUrlRef);
-    }
-}
 #endif
