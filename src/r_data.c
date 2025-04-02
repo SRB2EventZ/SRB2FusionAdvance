@@ -1272,8 +1272,8 @@ INT32 R_CreateColormap(char *p1, char *p2, char *p3)
 	extra_colormaps[mapnum].fadeend = (UINT16)fadeend;
 	extra_colormaps[mapnum].fog = fog;
 
-	// This code creates the colormap array used by software renderer
-	if (rendermode == render_soft)
+	
+	if (rendermode != render_none)
 	{
 		double r, g, b, cbrightness;
 		int p;
@@ -1372,35 +1372,7 @@ UINT8 NearestColor(UINT8 r, UINT8 g, UINT8 b)
 
 	return (UINT8)bestcolor;
 }
-// Thanks to quake2 source!
-// utils3/qdata/images.c
-UINT8 NearestPaletteColor(UINT8 r, UINT8 g, UINT8 b, RGBA_t *palette)
-{
-	int dr, dg, db;
-	int distortion, bestdistortion = 256 * 256 * 4, bestcolor = 0, i;
 
-	// Use local palette if none specified
-	if (palette == NULL)
-		palette = pLocalPalette;
-
-	for (i = 0; i < 256; i++)
-	{
-		dr = r - palette[i].s.red;
-		dg = g - palette[i].s.green;
-		db = b - palette[i].s.blue;
-		distortion = dr*dr + dg*dg + db*db;
-		if (distortion < bestdistortion)
-		{
-			if (!distortion)
-				return (UINT8)i;
-
-			bestdistortion = distortion;
-			bestcolor = i;
-		}
-	}
-
-	return (UINT8)bestcolor;
-}
 
 // Rounds off floating numbers and checks for 0 - 255 bounds
 static int RoundUp(double number)
