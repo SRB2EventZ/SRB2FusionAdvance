@@ -302,15 +302,6 @@ static sector_t *gr_backsector;
 boolean gr_shadersavailable = false;
 
 
-// ==========================================================================
-//   Lighting
-// ==========================================================================
-
-boolean HWR_UseShader(void)
-{
-	return (cv_grshaders.value && gr_shadersavailable);
-}
-
 // Whether the internal state is set to palette rendering or not.
 static boolean gr_palette_rendering_state = false;
 
@@ -334,8 +325,7 @@ static float gr_fovlud;
 static angle_t gr_aimingangle;
 static void HWR_SetTransformAiming(FTransform *trans, player_t *player, boolean skybox);
 
-// false if shaders have not been initialized yet, or if shaders are not available
-boolean gr_shadersavailable = false;
+
 
 
 // Render stats
