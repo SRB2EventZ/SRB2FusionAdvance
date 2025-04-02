@@ -517,60 +517,88 @@ void HWR_DrawFlatFill (INT32 x, INT32 y, INT32 w, INT32 h, lumpnum_t flatlumpnum
 	{
 		case 4194304: // 2048x2048 lump
 			dflatsize = 2048.0f;
-			flatflag = 2047;
+			flatflag = 2048;
 			break;
 		case 1048576: // 1024x1024 lump
 			dflatsize = 1024.0f;
-			flatflag = 1023;
+			flatflag = 1024;
 			break;
 		case 262144:// 512x512 lump
 			dflatsize = 512.0f;
-			flatflag = 511;
+			flatflag = 512;
 			break;
 		case 65536: // 256x256 lump
 			dflatsize = 256.0f;
-			flatflag = 255;
+			flatflag = 256;
 			break;
 		case 16384: // 128x128 lump
 			dflatsize = 128.0f;
-			flatflag = 127;
+			flatflag = 128;
 			break;
 		case 1024: // 32x32 lump
 			dflatsize = 32.0f;
-			flatflag = 31;
+			flatflag = 32;
 			break;
 		default: // 64x64 lump
 			dflatsize = 64.0f;
-			flatflag = 63;
+			flatflag = 64;
 			break;
 	}
+
+	    // compilers are COOL!
+		float dupx = (float)vid.dupx;
+		float dupy = (float)vid.dupy;
+		float fx = (float)x * dupx;
+		float fy = (float)y * dupy;
+		float fw = (float)w * dupx;
+		float fh = (float)h * dupy;
+
+
+	if (fw <= 0 || fh <= 0)
+		return;	
+
+	if (fabsf((float)vid.width - (float)BASEVIDWIDTH * vid.dupx) > 1.0E-36f)
+	{
+		fx += ((float)vid.width - ((float)BASEVIDWIDTH * vid.dupx)) / 2;
+	}
+
+	if (fabsf((float)vid.height - (float)BASEVIDHEIGHT * vid.dupy) > 1.0E-36f)
+	{
+		fy += ((float)vid.height - ((float)BASEVIDHEIGHT * vid.dupy)) / 2;
+	}
+
+	if (fx >= vid.width || fy >= vid.height)
+	return;
+
+	fx = -1.0f + (fx / (vid.width / 2.0f));
+	fy = 1.0f - (fy / (vid.height / 2.0f));
+	fw /= vid.width / 2;
+	fh /= vid.height / 2;
 
 //  3--2
 //  | /|
 //  |/ |
 //  0--1
 
-	v[0].x = v[3].x = (x - 160.0f)/160.0f;
-	v[2].x = v[1].x = ((x+w) - 160.0f)/160.0f;
-	v[0].y = v[1].y = -(y - 100.0f)/100.0f;
-	v[2].y = v[3].y = -((y+h) - 100.0f)/100.0f;
+    // position vertices
+	v[0].x = v[3].x = fx;
+	v[2].x = v[1].x = fx + fw;
+
+	v[0].y = v[1].y = fy;
+	v[2].y = v[3].y = fy - fh;
 
 	v[0].z = v[1].z = v[2].z = v[3].z = 1.0f;
 
-	// flat is 64x64 lod and texture offsets are [0.0, 1.0]
-	v[0].s = v[3].s = (float)((x & flatflag)/dflatsize);
-	v[2].s = v[1].s = (float)(v[0].s + w/dflatsize);
-	v[0].t = v[1].t = (float)((y & flatflag)/dflatsize);
-	v[2].t = v[3].t = (float)(v[0].t + h/dflatsize);
+    // sides
+	v[0].s = v[3].s = (float)(flatflag/dflatsize) * 2;
+	v[2].s = v[1].s = (float)(v[0].s + w/dflatsize) * 2;
 
+    // top/bottom
+	v[0].t = v[1].t = (float)(flatflag/dflatsize) * 2;
+	v[2].t = v[3].t = (float)(v[0].t + h/dflatsize) * 2;
+
+    // needed to texture the poly
 	HWR_GetFlat(flatlumpnum);
-
-	//Hurdler: Boris, the same comment as above... but maybe for pics
-	// it not a problem since they don't have any transparent pixel
-	// if I'm right !?
-	// BTW, I see we put 0 for PFs, and If I'm right, that
-	// means we take the previous PFs as default
-	// how can we be sure they are ok?
 	HWD.pfnDrawPolygon(NULL, v, 4, PF_NoDepthTest); //PF_Translucent);
 }
 

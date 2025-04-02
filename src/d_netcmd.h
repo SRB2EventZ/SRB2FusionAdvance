@@ -113,6 +113,10 @@ extern consvar_t cv_showping;
 
 extern consvar_t cv_sleep;
 
+extern consvar_t cv_perfstats;
+extern consvar_t cv_ps_samplesize;
+extern consvar_t cv_ps_descriptor;
+
 extern consvar_t cv_freedemocamera;
 
 #ifndef NONET
@@ -142,10 +146,8 @@ typedef enum
 	XD_SETMOTD,     // 19
 	XD_SUICIDE,     // 20
 	XD_DEMOTED,     // 21
-#ifdef HAVE_BLUA
 	XD_LUACMD,      // 22
 	XD_LUAVAR,      // 23
-#endif
 	MAXNETXCMD
 } netxcmd_t;
 

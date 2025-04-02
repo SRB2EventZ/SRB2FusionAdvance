@@ -142,6 +142,7 @@
 
 #ifdef LOGMESSAGES
 extern FILE *logstream;
+extern char logfilename[1024];
 #endif
 
 //#define DEVELOP // Disable this for release builds to remove excessive cheat commands and enable MD5 checking and stuff, all in one go. :3
@@ -154,10 +155,10 @@ extern FILE *logstream;
 // we use comprevision and compbranch instead.
 #else
 #define VERSION    201 // Game version
-#define SUBVERSION 27  // more precise version number
+#define SUBVERSION 28  // more precise version number
 #define SUBVERSION_NETCOMPAT 25  // for backwards compatibility with 2.1.25 servers
-#define VERSIONSTRING "Fusion Advance v2.1.27 1.0"
-#define VERSIONSTRINGW L"Fusion Advance v2.1.27 1.0"
+#define VERSIONSTRING "Fusion Advance v2.1.28 2.0"
+#define VERSIONSTRINGW L"Fusion Advance v2.1.28 2.0"
 // Hey! If you change this, add 1 to the MODVERSION below!
 // Otherwise we can't force updates!
 #endif
@@ -178,7 +179,7 @@ extern FILE *logstream;
 #define UPDATE_ALERT
 
 // If you maintain a fork of srb2-legacy, change this.
-#define RELEASES "github.com/P-AS/srb2-legacy/releases\n"
+#define RELEASES "github.com/SRB2EventZ/SRB2FusionAdvance/releases\n"
 
 // The string used in the alert that pops up in the event of an update being available.
 // Please change to apply to your modification (we don't want everyone asking where your mod is on SRB2.org!).
@@ -227,7 +228,7 @@ RELEASES \
 // it's only for detection of the version the player is using so the MS can alert them of an update.
 // Only set it higher, not lower, obviously.
 // Note that we use this to help keep internal testing in check; this is why v2.1.0 is not version "1".
-#define MODVERSION 32
+#define MODVERSION 33
 
 // To version config.cfg, MAJOREXECVERSION is set equal to MODVERSION automatically.
 // Increment MINOREXECVERSION whenever a config change is needed that does not correspond
@@ -474,11 +475,11 @@ extern const char *compdate, *comptime, *comprevision, *compbranch;
 /// Kalaron/Eternity Engine slope code (SRB2CB ported)
 #define ESLOPE
 
-#ifdef ESLOPE
+
 /// Backwards compatibility with SRB2CB's slope linedef types.
 ///	\note	A simple shim that prints a warning.
 #define ESLOPE_TYPESHIM
-#endif
+
 
 ///	Delete file while the game is running.
 ///	\note	EXTREMELY buggy, tends to crash game.

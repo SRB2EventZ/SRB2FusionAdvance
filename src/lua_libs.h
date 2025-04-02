@@ -10,8 +10,6 @@
 /// \file  lua_libs.h
 /// \brief libraries for Lua scripting
 
-#ifdef HAVE_BLUA
-
 extern lua_State *gL;
 
 #define LREG_VALID "VALID_USERDATA"
@@ -38,11 +36,9 @@ extern lua_State *gL;
 #define META_SUBSECTOR "SUBSECTOR_T*"
 #define META_SECTOR "SECTOR_T*"
 #define META_FFLOOR "FFLOOR_T*"
-#ifdef ESLOPE
 #define META_SLOPE "PSLOPE_T*"
 #define META_VECTOR2 "VECTOR2_T"
 #define META_VECTOR3 "VECTOR3_T"
-#endif
 #define META_MAPHEADER "MAPHEADER_T*"
 
 #define META_CVAR "CONSVAR_T*"
@@ -71,5 +67,3 @@ int LUA_ThinkerLib(lua_State *L);
 int LUA_MapLib(lua_State *L);
 int LUA_BlockmapLib(lua_State *L);
 int LUA_HudLib(lua_State *L);
-
-#endif

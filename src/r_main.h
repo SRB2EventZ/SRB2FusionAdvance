@@ -16,6 +16,7 @@
 
 #include "d_player.h"
 #include "r_data.h"
+#include "m_perfstats.h"
 
 //
 // POV related.
@@ -33,6 +34,8 @@ extern size_t validcount, linecount, loopcount, framecount;
 extern fixed_t rendertimefrac;
 // Evaluated delta tics for this frame (how many tics since the last frame)
 extern fixed_t renderdeltatics;
+// The current render is a new logical tic
+extern boolean renderisnewtic;
 
 
 
@@ -62,36 +65,25 @@ extern lighttable_t *zlight[LIGHTLEVELS][MAXLIGHTZ];
 #define NUMCOLORMAPS 32
 
 // Utility functions.
-//
-// R_PointOnSide
-// Traverse BSP (sub) tree,
-// check point against partition plane.
-// Returns side 0 (front) or 1 (back).
-//
-// killough 5/2/98: reformatted
-//
-FUNCINLINE static ATTRINLINE INT32 R_PointOnSide(fixed_t x, fixed_t y, const node_t *restrict node)
-{
-	if (!node->dx)
-		return x <= node->x ? node->dy > 0 : node->dy < 0;
-	if (!node->dy)
-		return y <= node->y ? node->dx < 0 : node->dx > 0;
-	x -= node->x;
-	y -= node->y;
-	// Try to quickly decide by looking at sign bits.
-	// also use a mask to avoid branch prediction
-	INT32 mask = (node->dy ^ node->dx ^ x ^ y) >> 31;
-	return (mask & ((node->dy ^ x) < 0)) |  // (left is negative)
-	(~mask & (FixedMul(y, node->dx>>FRACBITS) >= FixedMul(node->dy>>FRACBITS, x)));
-}
+INT32 R_OldPointOnSide(fixed_t x, fixed_t y, const node_t *node);
 
-FUNCINLINE static ATTRINLINE INT32 R_PointOnSideFast(fixed_t x, fixed_t y, const node_t *node)
+FUNCINLINE INT32 ATTRINLINE PUREFUNC R_PointOnSide(fixed_t x, fixed_t y, const node_t *node)
 {
 	// use cross product to determine side quickly
-	return (INT64)(y - node->y) * node->dx - (INT64)(x - node->x) * node->dy > 0;
+	return ((INT64)y - node->y) * node->dx - ((INT64)x - node->x) * node->dy > 0;
 }
 
-INT32 R_PointOnSegSide(fixed_t x, fixed_t y, seg_t *restrict line);
+FUNCINLINE INT32 ATTRINLINE PUREFUNC R_PointOnSegSide(fixed_t x, fixed_t y, const seg_t *line)
+{
+	fixed_t lx = line->v1->x;
+	fixed_t ly = line->v1->y;
+	fixed_t ldx = line->v2->x - lx;
+	fixed_t ldy = line->v2->y - ly;
+
+	// use cross product to determine side quickly
+	return ((INT64)y - ly) * ldx - ((INT64)x - lx) * ldy > 0;
+}
+
 angle_t R_PointToAngle(fixed_t x, fixed_t y);
 angle_t R_PointToAngle2(fixed_t px2, fixed_t py2, fixed_t px1, fixed_t py1);
 angle_t R_PointToAngleEx(INT32 x2, INT32 y2, INT32 x1, INT32 y1);
@@ -99,9 +91,33 @@ fixed_t R_PointToDist(fixed_t x, fixed_t y);
 fixed_t R_PointToDist2(fixed_t px2, fixed_t py2, fixed_t px1, fixed_t py1);
 
 fixed_t R_ScaleFromGlobalAngle(angle_t visangle);
+boolean R_IsPointInSector(sector_t *sector, fixed_t x, fixed_t y);
+subsector_t *R_OldPointInSubsector(fixed_t x, fixed_t y);
 subsector_t *R_IsPointInSubsector(fixed_t x, fixed_t y);
 
 boolean R_DoCulling(line_t *cullheight, line_t *viewcullheight, fixed_t vz, fixed_t bottomh, fixed_t toph);
+
+// Render stats
+
+extern precise_t ps_prevframetime;// time when previous frame was rendered
+extern ps_metric_t ps_rendercalltime;
+extern ps_metric_t ps_otherrendertime;
+extern ps_metric_t ps_uitime;
+extern ps_metric_t ps_swaptime;
+
+extern ps_metric_t ps_skyboxtime;
+extern ps_metric_t ps_bsptime;
+
+extern ps_metric_t ps_sw_spritecliptime;
+extern ps_metric_t ps_sw_portaltime;
+extern ps_metric_t ps_sw_planetime;
+extern ps_metric_t ps_sw_maskedtime;
+
+extern ps_metric_t ps_numbspcalls;
+extern ps_metric_t ps_numsprites;
+extern ps_metric_t ps_numdrawnodes;
+extern ps_metric_t ps_numpolyobjects;
+
 
 //
 // R_PointInSubsector

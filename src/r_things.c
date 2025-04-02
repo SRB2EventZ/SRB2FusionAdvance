@@ -76,6 +76,33 @@ static spriteframe_t sprtemp[64];
 static size_t maxframe;
 static const char *spritename;
 
+//
+// Clipping against drawsegs optimization, from prboom-plus
+//
+// TODO: This should be done with proper subsector pass through
+// sprites which would ideally remove the need to do it at all.
+// Unfortunately, SRB2's drawing loop has lots of annoying
+// changes from Doom for portals, which make it hard to implement.
+
+typedef struct drawseg_xrange_item_s
+{
+	INT16 x1, x2;
+	drawseg_t *user;
+} drawseg_xrange_item_t;
+
+typedef struct drawsegs_xrange_s
+{
+	drawseg_xrange_item_t *items;
+	INT32 count;
+} drawsegs_xrange_t;
+
+#define DS_RANGES_COUNT 3
+static drawsegs_xrange_t drawsegs_xranges[DS_RANGES_COUNT];
+
+static drawseg_xrange_item_t *drawsegs_xrange;
+static size_t drawsegs_xrange_size = 0;
+static INT32 drawsegs_xrange_count = 0;
+
 // ==========================================================================
 //
 // Sprite loading routines: support sprites in pwad, dehacked sprite renaming,
@@ -497,7 +524,7 @@ void R_DelSpriteDefs(UINT16 wadnum)
 //
 // GAME FUNCTIONS
 //
-static UINT32 visspritecount;
+UINT32 visspritecount;
 static UINT32 clippedvissprites;
 static vissprite_t *visspritechunks[MAXVISSPRITES >> VISSPRITECHUNKBITS] = {NULL};
 
@@ -963,10 +990,10 @@ static void R_SplitSprite(vissprite_t *sprite, mobj_t *thing)
 		if (!(sector->lightlist[i].caster->flags & FF_CUTSPRITES))
 			continue;
 
-#ifdef ESLOPE
+
 		if (sector->lightlist[i].slope)
 			testheight = P_GetZAt(sector->lightlist[i].slope, sprite->gx, sprite->gy);
-#endif
+
 
 		if (testheight >= sprite->gzt)
 			continue;
@@ -1323,7 +1350,7 @@ static void R_ProjectSprite(mobj_t *thing)
 	if (thing->subsector->sector->numlights)
 	{
 		INT32 lightnum;
-#ifdef ESLOPE // R_GetPlaneLight won't work on sloped lights!
+		// R_GetPlaneLight won't work on sloped lights!
 		light = thing->subsector->sector->numlights - 1;
 
 		for (lightnum = 1; lightnum < thing->subsector->sector->numlights; lightnum++) {
@@ -1334,9 +1361,6 @@ static void R_ProjectSprite(mobj_t *thing)
 				break;
 			}
 		}
-#else
-		light = R_GetPlaneLight(thing->subsector->sector, gzt, false);
-#endif
 		lightnum = (*thing->subsector->sector->lightlist[light].lightlevel >> LIGHTSEGSHIFT);
 
 		if (lightnum < 0)
@@ -1853,7 +1877,6 @@ static void R_CreateDrawNodes(void)
 				entry->ffloor = ds->thicksides[i];
 			}
 		}
-#ifdef POLYOBJECTS_PLANES
 		// Check for a polyobject plane, but only if this is a front line
 		if (ds->curline->polyseg && ds->curline->polyseg->visplane && !ds->curline->side) {
 			plane = ds->curline->polyseg->visplane;
@@ -1869,7 +1892,6 @@ static void R_CreateDrawNodes(void)
 			}
 			ds->curline->polyseg->visplane = NULL;
 		}
-#endif
 		if (ds->maskedtexturecol)
 		{
 			entry = R_CreateDrawNode(&nodehead);
@@ -1914,7 +1936,7 @@ static void R_CreateDrawNodes(void)
 		}
 	}
 
-#ifdef POLYOBJECTS_PLANES
+
 	// find all the remaining polyobject planes and add them on the end of the list
 	// probably this is a terrible idea if we wanted them to be sorted properly
 	// but it works getting them in for now
@@ -1935,7 +1957,7 @@ static void R_CreateDrawNodes(void)
 		// note: no seg is set, for what should be obvious reasons
 		PolyObjects[i].visplane = NULL;
 	}
-#endif
+
 
 	if (visspritecount == 0)
 		return;
@@ -1958,13 +1980,12 @@ static void R_CreateDrawNodes(void)
 				if (rover->szt > r2->plane->low || rover->sz < r2->plane->high)
 					continue;
 
-#ifdef ESLOPE
+
 				// Effective height may be different for each comparison in the case of slopes
 				if (r2->plane->slope) {
 					planeobjectz = P_GetZAt(r2->plane->slope, rover->gx, rover->gy);
 					planecameraz = P_GetZAt(r2->plane->slope, viewx, viewy);
 				} else
-#endif
 					planeobjectz = planecameraz = r2->plane->height;
 
 				if (rover->mobjflags & MF_NOCLIPHEIGHT)
@@ -2023,20 +2044,20 @@ static void R_CreateDrawNodes(void)
 				if (scale <= rover->scale)
 					continue;
 
-#ifdef ESLOPE
+
 				if (*r2->ffloor->t_slope) {
 					topplaneobjectz = P_GetZAt(*r2->ffloor->t_slope, rover->gx, rover->gy);
 					topplanecameraz = P_GetZAt(*r2->ffloor->t_slope, viewx, viewy);
 				} else
-#endif
+
 					topplaneobjectz = topplanecameraz = *r2->ffloor->topheight;
 
-#ifdef ESLOPE
+
 				if (*r2->ffloor->b_slope) {
 					botplaneobjectz = P_GetZAt(*r2->ffloor->b_slope, rover->gx, rover->gy);
 					botplanecameraz = P_GetZAt(*r2->ffloor->b_slope, viewx, viewy);
 				} else
-#endif
+
 					botplaneobjectz = botplanecameraz = *r2->ffloor->bottomheight;
 
 				if ((topplanecameraz > viewz && botplanecameraz < viewz) ||
@@ -2052,20 +2073,7 @@ static void R_CreateDrawNodes(void)
 			}
 			else if (r2->seg)
 			{
-#if 0 //#ifdef POLYOBJECTS_PLANES
-				if (r2->seg->curline->polyseg && rover->mobj && P_MobjInsidePolyobj(r2->seg->curline->polyseg, rover->mobj)) {
-					// Determine if we need to sort in front of the polyobj, based on the planes. This fixes the issue where
-					// polyobject planes render above the object standing on them. (A bit hacky... but it works.) -Red
-					mobj_t *mo = rover->mobj;
-					sector_t *po = r2->seg->curline->backsector;
 
-					if (po->ceilingheight < viewz && mo->z+mo->height > po->ceilingheight)
-						continue;
-
-					if (po->floorheight > viewz && mo->z < po->floorheight)
-						continue;
-				}
-#endif
 				if (rover->x1 > r2->seg->x2 || rover->x2 < r2->seg->x1)
 					continue;
 
@@ -2135,6 +2143,7 @@ static drawnode_t *R_CreateDrawNode(drawnode_t *link)
 	node->thickseg = NULL;
 	node->ffloor = NULL;
 	node->sprite = NULL;
+	ps_numdrawnodes.value.i++;
 	return node;
 }
 
@@ -2191,21 +2200,93 @@ static void R_DrawPrecipitationSprite(vissprite_t *spr)
 // Clips vissprites without drawing, so that portals can work. -Red
 void R_ClipSprites(void)
 {
+	const size_t maxdrawsegs = ds_p - drawsegs;
+	const INT32 cx = viewwidth / 2;
+	drawseg_t* ds;
+	INT32 i;
+
+	// e6y
+	// Reducing of cache misses in the following R_DrawSprite()
+	// Makes sense for scenes with huge amount of drawsegs.
+	// ~12% of speed improvement on epic.wad map05
+	for (i = 0; i < DS_RANGES_COUNT; i++)
+		drawsegs_xranges[i].count = 0;
+
+	if (visspritecount - clippedvissprites <= 0)
+		return;
+
+	if (drawsegs_xrange_size < maxdrawsegs)
+	{
+		drawsegs_xrange_size = 2 * maxdrawsegs;
+
+		for (i = 0; i < DS_RANGES_COUNT; i++)
+		{
+			drawsegs_xranges[i].items = Z_Realloc(
+				drawsegs_xranges[i].items,
+				drawsegs_xrange_size * sizeof(drawsegs_xranges[i].items[0]),
+				PU_STATIC, NULL
+			);
+		}
+	}
+
+	for (ds = ds_p; ds-- > drawsegs;)
+	{
+		if (ds->silhouette || ds->maskedtexturecol)
+		{
+			drawsegs_xranges[0].items[drawsegs_xranges[0].count].x1 = ds->x1;
+			drawsegs_xranges[0].items[drawsegs_xranges[0].count].x2 = ds->x2;
+			drawsegs_xranges[0].items[drawsegs_xranges[0].count].user = ds;
+
+			// e6y: ~13% of speed improvement on sunder.wad map10
+			if (ds->x1 < cx)
+			{
+				drawsegs_xranges[1].items[drawsegs_xranges[1].count] =
+					drawsegs_xranges[0].items[drawsegs_xranges[0].count];
+				drawsegs_xranges[1].count++;
+			}
+
+			if (ds->x2 >= cx)
+			{
+				drawsegs_xranges[2].items[drawsegs_xranges[2].count] =
+					drawsegs_xranges[0].items[drawsegs_xranges[0].count];
+				drawsegs_xranges[2].count++;
+			}
+
+			drawsegs_xranges[0].count++;
+		}
+	}
+
 	vissprite_t *spr;
 	for (;clippedvissprites < visspritecount; clippedvissprites++)
 	{
 		drawseg_t *ds;
-		INT32		x;
-		INT32		r1;
-		INT32		r2;
-		fixed_t		scale;
-		fixed_t		lowscale;
-		INT32		silhouette;
+		INT32 x;
+		INT32 r1;
+		INT32 r2;
+		fixed_t scale;
+		fixed_t lowscale;
+		INT32 silhouette;
 
 		spr = R_GetVisSprite(clippedvissprites);
 
 		for (x = spr->x1; x <= spr->x2; x++)
 			spr->clipbot[x] = spr->cliptop[x] = -2;
+
+		if (spr->x2 < cx)
+		{
+			drawsegs_xrange = drawsegs_xranges[1].items;
+			drawsegs_xrange_count = drawsegs_xranges[1].count;
+		}
+		else if (spr->x1 >= cx)
+		{
+			drawsegs_xrange = drawsegs_xranges[2].items;
+			drawsegs_xrange_count = drawsegs_xranges[2].count;
+		}
+		else
+		{
+			drawsegs_xrange = drawsegs_xranges[0].items;
+			drawsegs_xrange_count = drawsegs_xranges[0].count;
+		}
 
 		// Scan drawsegs from end to start for obscuring segs.
 		// The first drawseg that has a greater scale
@@ -2214,79 +2295,84 @@ void R_ClipSprites(void)
 		// Pointer check was originally nonportable
 		// and buggy, by going past LEFT end of array:
 
-		//    for (ds = ds_p-1; ds >= drawsegs; ds--)    old buggy code
-		for (ds = ds_p; ds-- > drawsegs ;)
+		// e6y: optimization
+		if (drawsegs_xrange_size)
 		{
-			// determine if the drawseg obscures the sprite
-			if (ds->x1 > spr->x2 ||
-			    ds->x2 < spr->x1 ||
-			    (!ds->silhouette
-			     && !ds->maskedtexturecol))
+			const drawseg_xrange_item_t *last = &drawsegs_xrange[drawsegs_xrange_count - 1];
+			drawseg_xrange_item_t *curr = &drawsegs_xrange[-1];
+
+			while (++curr <= last)
 			{
-				// does not cover sprite
-				continue;
-			}
-
-			if (ds->portalpass > 0 && ds->portalpass <= portalrender)
-				continue; // is a portal
-
-			r1 = ds->x1 < spr->x1 ? spr->x1 : ds->x1;
-			r2 = ds->x2 > spr->x2 ? spr->x2 : ds->x2;
-
-			if (ds->scale1 > ds->scale2)
-			{
-				lowscale = ds->scale2;
-				scale = ds->scale1;
-			}
-			else
-			{
-				lowscale = ds->scale1;
-				scale = ds->scale2;
-			}
-
-			if (scale < spr->scale ||
-			    (lowscale < spr->scale &&
-			     !R_PointOnSegSide (spr->gx, spr->gy, ds->curline)))
-			{
-				// masked mid texture?
-				/*if (ds->maskedtexturecol)
-					R_RenderMaskedSegRange (ds, r1, r2);*/
-				// seg is behind sprite
-				continue;
-			}
-
-			// clip this piece of the sprite
-			silhouette = ds->silhouette;
-
-			if (spr->gz >= ds->bsilheight)
-				silhouette &= ~SIL_BOTTOM;
-
-			if (spr->gzt <= ds->tsilheight)
-				silhouette &= ~SIL_TOP;
-
-			if (silhouette == SIL_BOTTOM)
-			{
-				// bottom sil
-				for (x = r1; x <= r2; x++)
-					if (spr->clipbot[x] == -2)
-						spr->clipbot[x] = ds->sprbottomclip[x];
-			}
-			else if (silhouette == SIL_TOP)
-			{
-				// top sil
-				for (x = r1; x <= r2; x++)
-					if (spr->cliptop[x] == -2)
-						spr->cliptop[x] = ds->sprtopclip[x];
-			}
-			else if (silhouette == (SIL_TOP|SIL_BOTTOM))
-			{
-				// both
-				for (x = r1; x <= r2; x++)
+				// determine if the drawseg obscures the sprite
+				if (curr->x1 > spr->x2 || curr->x2 < spr->x1)
 				{
-					if (spr->clipbot[x] == -2)
-						spr->clipbot[x] = ds->sprbottomclip[x];
-					if (spr->cliptop[x] == -2)
-						spr->cliptop[x] = ds->sprtopclip[x];
+					// does not cover sprite
+					continue;
+				}
+
+				ds = curr->user;
+
+				if (ds->portalpass > 0 && ds->portalpass <= portalrender)
+					continue; // is a portal
+
+				r1 = ds->x1 < spr->x1 ? spr->x1 : ds->x1;
+				r2 = ds->x2 > spr->x2 ? spr->x2 : ds->x2;
+
+				if (ds->scale1 > ds->scale2)
+				{
+					lowscale = ds->scale2;
+					scale = ds->scale1;
+				}
+				else
+				{
+					lowscale = ds->scale1;
+					scale = ds->scale2;
+				}
+
+				if (scale < spr->scale ||
+				    (lowscale < spr->scale &&
+				     !R_PointOnSegSide (spr->gx, spr->gy, ds->curline)))
+				{
+					// masked mid texture?
+					/*if (ds->maskedtexturecol)
+						R_RenderMaskedSegRange (ds, r1, r2);*/
+					// seg is behind sprite
+					continue;
+				}
+
+				// clip this piece of the sprite
+				silhouette = ds->silhouette;
+
+				if (spr->gz >= ds->bsilheight)
+					silhouette &= ~SIL_BOTTOM;
+
+				if (spr->gzt <= ds->tsilheight)
+					silhouette &= ~SIL_TOP;
+
+				if (silhouette == SIL_BOTTOM)
+				{
+					// bottom sil
+					for (x = r1; x <= r2; x++)
+						if (spr->clipbot[x] == -2)
+							spr->clipbot[x] = ds->sprbottomclip[x];
+				}
+				else if (silhouette == SIL_TOP)
+				{
+					// top sil
+					for (x = r1; x <= r2; x++)
+						if (spr->cliptop[x] == -2)
+							spr->cliptop[x] = ds->sprtopclip[x];
+				}
+				else if (silhouette == (SIL_TOP|SIL_BOTTOM))
+				{
+					// both
+					for (x = r1; x <= r2; x++)
+					{
+						if (spr->clipbot[x] == -2)
+							spr->clipbot[x] = ds->sprbottomclip[x];
+						if (spr->cliptop[x] == -2)
+							spr->cliptop[x] = ds->sprtopclip[x];
+					}
 				}
 			}
 		}

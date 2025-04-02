@@ -841,6 +841,11 @@ EXPORT void HWRAPI(SetShaderInfo) (hwdshaderinfo_t info, INT32 value)
 EXPORT void HWRAPI(SetShader) (int slot)
 {
 #ifdef GL_SHADERS
+	if (slot == SHADER_NONE)
+	{
+		UnSetShader();
+			return;
+	}
 	if (gl_allowshaders)
 	{
 		gl_shader_t *next_shader = &gl_shaders[slot]; // the gl_shader_t we are going to switch to
@@ -2734,6 +2739,8 @@ EXPORT void HWRAPI(SetTransform) (FTransform *stransform)
 		if (shearing)
 		{
 			float fdy = stransform->viewaiming * 2;
+			if (stransform->flip)
+				fdy *= -1.0f;
 			pglTranslatef(0.0f, -fdy/BASEVIDHEIGHT, 0.0f);
 		}
 		special_splitscreen = (stransform->splitscreen == 1 && stransform->fovxangle == 90.0f);

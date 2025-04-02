@@ -152,7 +152,9 @@ typedef struct
 // The shader returned may be a base shader or a custom shader.
 enum
 {
-	SHADER_FLOOR,
+	SHADER_NONE = -1,
+	
+	SHADER_FLOOR = 0,
 	SHADER_WALL,
 	SHADER_SPRITE,
 	SHADER_MODEL,

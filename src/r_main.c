@@ -77,6 +77,7 @@ mobj_t *r_viewmobj;
 
 fixed_t rendertimefrac;
 fixed_t renderdeltatics;
+boolean renderisnewtic;
 
 
 // PORTALS!
@@ -131,6 +132,26 @@ lighttable_t *zlight[LIGHTLEVELS][MAXLIGHTZ];
 // Hack to support extra boom colormaps.
 size_t num_extra_colormaps;
 extracolormap_t extra_colormaps[MAXCOLORMAPS];
+
+// Render stats
+precise_t ps_prevframetime = 0;
+ps_metric_t ps_rendercalltime = {0};
+ps_metric_t ps_otherrendertime = {0};
+ps_metric_t ps_uitime = {0};
+ps_metric_t ps_swaptime = {0};
+
+ps_metric_t ps_skyboxtime = {0};
+ps_metric_t ps_bsptime = {0};
+
+ps_metric_t ps_sw_spritecliptime = {0};
+ps_metric_t ps_sw_portaltime = {0};
+ps_metric_t ps_sw_planetime = {0};
+ps_metric_t ps_sw_maskedtime = {0};
+
+ps_metric_t ps_numbspcalls = {0};
+ps_metric_t ps_numsprites = {0};
+ps_metric_t ps_numdrawnodes = {0};
+ps_metric_t ps_numpolyobjects = {0};
 
 static CV_PossibleValue_t drawdist_cons_t[] = {
 	{256, "256"},	{512, "512"},	{768, "768"},
@@ -245,28 +266,29 @@ static void FlipCam2_OnChange(void)
 	SendWeaponPref2();
 }
 
-
+//
+// R_OldPointOnSide
+// Traverse BSP (sub) tree,
+// check point against partition plane.
+// Returns side 0 (front) or 1 (back).
+//
 // killough 5/2/98: reformatted
-INT32 R_PointOnSegSide(fixed_t x, fixed_t y, seg_t *restrict line)
+//
+PUREFUNC INT32 R_OldPointOnSide(fixed_t x, fixed_t y, const node_t *restrict node)
 {
-	fixed_t lx = line->v1->x;
-	fixed_t ly = line->v1->y;
-	fixed_t ldx = line->v2->x - lx;
-	fixed_t ldy = line->v2->y - ly;
+	if (!node->dx)
+		return x <= node->x ? node->dy > 0 : node->dy < 0;
 
-	if (!ldx)
-		return x <= lx ? ldy > 0 : ldy < 0;
+	if (!node->dy)
+		return y <= node->y ? node->dx < 0 : node->dx > 0;
 
-	if (!ldy)
-		return y <= ly ? ldx < 0 : ldx > 0;
-
-	x -= lx;
-	y -= ly;
+	x -= node->x;
+	y -= node->y;
 
 	// Try to quickly decide by looking at sign bits.
-	INT32 mask = (ldy ^ ldx ^ x ^ y) >> 31;
-	return (mask & ((ldy ^ x) < 0)) |	// (left is negative)
-		(~mask & (FixedMul(y, ldx>>FRACBITS) >= FixedMul(ldy>>FRACBITS, x)));
+	INT32 mask = (node->dy ^ node->dx ^ x ^ y) >> 31;
+	return (mask & ((node->dy ^ x) < 0)) |	// (left is negative)
+		(~mask & (FixedMul(y, node->dx>>FRACBITS) >= FixedMul(node->dy>>FRACBITS, x)));
 }
 
 //
@@ -459,9 +481,9 @@ static void R_InitTextureMapping(void)
 	focallength = FixedDiv(centerxfrac,
 		FINETANGENT(FINEANGLES/4+/*cv_fov.value*/ FIELDOFVIEW/2));
 
-#ifdef ESLOPE
+
 	focallengthf = FIXED_TO_FLOAT(focallength);
-#endif
+
 
 	for (i = 0; i < FINEANGLES/2; i++)
 	{
@@ -684,6 +706,63 @@ void R_Init(void)
 	framecount = 0;
 }
 
+//
+// R_IsPointInSector
+//
+boolean R_IsPointInSector(sector_t *sector, fixed_t x, fixed_t y)
+{
+	size_t i;
+	size_t passes = 0;
+
+	for (i = 0; i < sector->linecount; i++)
+	{
+		line_t *line = sector->lines[i];
+		vertex_t *v1, *v2;
+
+		if (line->frontsector == line->backsector)
+			continue;
+
+		v1 = line->v1;
+		v2 = line->v2;
+
+		// make sure v1 is below v2
+		if (v1->y > v2->y)
+		{
+			vertex_t *tmp = v1;
+			v1 = v2;
+			v2 = tmp;
+		}
+		else if (v1->y == v2->y)
+			// horizontal line, we can't match this
+			continue;
+
+		if (v1->y < y && y <= v2->y)
+		{
+			// if the y axis in inside the line, find the point where we intersect on the x axis...
+			fixed_t vx = v1->x + (INT64)(v2->x - v1->x) * (y - v1->y) / (v2->y - v1->y);
+
+			// ...and if that point is to the left of the point, count it as inside.
+			if (vx < x)
+				passes++;
+		}
+	}
+
+	// and odd number of passes means we're inside the polygon.
+	return passes % 2;
+}
+
+//
+// R_OldPointInSubsector
+//
+subsector_t *R_OldPointInSubsector(fixed_t x, fixed_t y)
+{
+	size_t nodenum = numnodes-1;
+
+	while (!(nodenum & NF_SUBSECTOR))
+		nodenum = nodes[nodenum].children[R_OldPointOnSide(x, y, nodes+nodenum)];
+
+	return &subsectors[nodenum & ~NF_SUBSECTOR];
+}
 
 //
 // R_IsPointInSubsector, same as above but returns 0 if not in subsector
@@ -710,7 +789,6 @@ subsector_t *R_IsPointInSubsector(fixed_t x, fixed_t y)
 
 	ret = &subsectors[nodenum & ~NF_SUBSECTOR];
 	for (i = 0; i < ret->numlines; i++)
-		//if (R_PointOnSegSide(x, y, &segs[ret->firstline + i])) -- breaks in ogl because polyvertex_t cast over vertex pointers
 		if (P_PointOnLineSide(x, y, segs[ret->firstline + i].linedef) != segs[ret->firstline + i].side)
 			return 0;
 
@@ -1249,6 +1327,7 @@ void R_RenderPlayerView(player_t *player)
 	portalrender = 0;
 	portal_base = portal_cap = NULL;
 
+	PS_START_TIMING(ps_skyboxtime);
 	if (skybox && skyVisible)
 	{
 		R_SkyboxFrame(player);
@@ -1269,6 +1348,7 @@ void R_RenderPlayerView(player_t *player)
 #endif
 		R_DrawMasked();
 	}
+	PS_STOP_TIMING(ps_skyboxtime);
 
 	R_SetupFrame(player, skybox);
 	skyVisible = false;
@@ -1294,8 +1374,14 @@ void R_RenderPlayerView(player_t *player)
 	mytotal = 0;
 	ProfZeroTimer();
 #endif
+	ps_numbspcalls.value.i = ps_numpolyobjects.value.i = ps_numdrawnodes.value.i = 0;
+	PS_START_TIMING(ps_bsptime);
 	R_RenderBSPNode((INT32)numnodes - 1);
+	PS_STOP_TIMING(ps_bsptime);
+	ps_numsprites.value.i = visspritecount;
+	PS_START_TIMING(ps_sw_spritecliptime);
 	R_ClipSprites();
+	PS_STOP_TIMING(ps_sw_spritecliptime);
 #ifdef TIMING
 	RDMSR(0x10, &mycount);
 	mytotal += mycount; // 64bit add
@@ -1308,6 +1394,7 @@ void R_RenderPlayerView(player_t *player)
 
 
 	// PORTAL RENDERING
+	PS_START_TIMING(ps_sw_portaltime);
 	for(portal = portal_base; portal; portal = portal_base)
 	{
 		// render the portal
@@ -1335,15 +1422,20 @@ void R_RenderPlayerView(player_t *player)
 		Z_Free(portal->frontscale);
 		Z_Free(portal);
 	}
+	PS_STOP_TIMING(ps_sw_portaltime);
 	// END PORTAL RENDERING
 
+	PS_START_TIMING(ps_sw_planetime);
 	R_DrawPlanes();
+	PS_STOP_TIMING(ps_sw_planetime);
 #ifdef FLOORSPLATS
 	R_DrawVisibleFloorSplats();
 #endif
 	// draw mid texture and sprite
 	// And now 3D floors/sides!
+	PS_START_TIMING(ps_sw_maskedtime);
 	R_DrawMasked();
+	PS_STOP_TIMING(ps_sw_maskedtime);
 
 	// Check for new console commands.
 	NetUpdate();

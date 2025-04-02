@@ -918,9 +918,9 @@ static menuitem_t MP_SplitServerMenu[] =
 
 static menuitem_t MP_PlayerSetupMenu[] =
 {
-	{IT_KEYHANDLER | IT_STRING,   NULL, "Your name",   M_HandleSetupMultiPlayer,   0},
-	{IT_KEYHANDLER | IT_STRING,   NULL, "Your color",  M_HandleSetupMultiPlayer,  16},
-	{IT_KEYHANDLER | IT_STRING,   NULL, "Your player", M_HandleSetupMultiPlayer,  96}, // Tails 01-18-2001
+	{IT_KEYHANDLER | IT_WHITESTRING,   NULL, "Name",   M_HandleSetupMultiPlayer,   8},
+	{IT_KEYHANDLER | IT_WHITESTRING,   NULL, "Character",  M_HandleSetupMultiPlayer,  40},
+	{IT_KEYHANDLER | IT_WHITESTRING,   NULL, "Color", M_HandleSetupMultiPlayer,  122}, // Tails 01-18-2001
 };
 
 // ------------------------------------
@@ -1728,7 +1728,7 @@ menu_t MP_PlayerSetupDef =
 	&MP_MainDef,
 	MP_PlayerSetupMenu,
 	M_DrawSetupMultiPlayerMenu,
-	27, 40,
+	32, 16,
 	0,
 	M_QuitMultiPlayerMenu
 };
@@ -2533,7 +2533,6 @@ boolean M_Responder(event_t *ev)
 				//make sure the game doesn't still think we're in a netgame.
 				if (!Playing() && netgame && multiplayer)
 				{
-					MSCloseUDPSocket();		// Clean up so we can re-open the connection later.
 					netgame = false;
 					multiplayer = false;
 				}
@@ -4564,12 +4563,6 @@ static void M_HandleAddons(INT32 choice)
 							M_AddonExec(KEY_ENTER);
 							break;
 						case EXT_LUA:
-#ifndef HAVE_BLUA
-							S_StartSound(NULL, sfx_lose);
-							M_StartMessage(va("%c%s\x80\nThis copy of SRB2 was compiled\nwithout support for .lua files.\n\n(Press a key)\n", ('\x80' + (highlightflags>>V_CHARCOLORSHIFT)), dirmenu[dir_on[menudepthleft]]+DIR_STRING),NULL,MM_NOTHING);
-							break;
-#endif
-						// else intentional fallthrough
 						case EXT_SOC:
 						case EXT_WAD:
 #ifdef USE_KART
@@ -4816,12 +4809,15 @@ static void M_DrawChecklist(void)
 
 	for (i = 0; i < MAXUNLOCKABLES; i++)
 	{
+		char *s;
 		if (unlockables[i].name[0] == 0 || unlockables[i].nochecklist
 		|| !unlockables[i].conditionset || unlockables[i].conditionset > MAXCONDITIONSETS)
 			continue;
 
+		s = V_WordWrap(160, 292, 0, unlockables[i].objective);
 		V_DrawString(8, 8+(24*j), V_RETURN8, unlockables[i].name);
-		V_DrawString(160, 8+(24*j), V_RETURN8, V_WordWrap(160, 292, 0, unlockables[i].objective));
+		V_DrawString(160, 8+(24*j), V_RETURN8, s);
+		Z_Free(s);
 
 		if (unlockables[i].unlocked)
 			V_DrawString(308, 8+(24*j), V_YELLOWMAP, "Y");
@@ -4848,7 +4844,7 @@ static void M_DrawEmblemHints(void)
 	INT32 i, j = 0;
 	UINT32 collected = 0;
 	emblem_t *emblem;
-	const char *hint;
+	char *hint;
 
 	for (i = 0; i < numemblems; i++)
 	{
@@ -4874,6 +4870,7 @@ static void M_DrawEmblemHints(void)
 			hint = M_GetText("No hints available.");
 		hint = V_WordWrap(40, BASEVIDWIDTH-12, 0, hint);
 		V_DrawString(40, 8+(28*j), V_RETURN8|V_ALLOWLOWERCASE|collected, hint);
+		Z_Free(hint);
 
 		if (++j >= NUMHINTS)
 			break;
@@ -5186,6 +5183,8 @@ static void M_DrawLoadGameData(void)
 	{
 		UINT8 *colormap = R_GetTranslationColormap(savegameinfo[saveSlotSelected].skinnum, savegameinfo[saveSlotSelected].skincolor, 0);
 		V_DrawMappedPatch(SP_LoadDef.x,144+8,0,W_CachePatchName(skins[savegameinfo[saveSlotSelected].skinnum].face, PU_CACHE), colormap);
+
+		Z_Free(colormap);
 	}
 
 	V_DrawString(ecks + 12, 152, 0, savegameinfo[saveSlotSelected].playername);
@@ -6678,7 +6677,7 @@ static INT32 menuRoomIndex = 0;
 
 static void M_DrawRoomMenu(void)
 {
-	const char *rmotd;
+	char *rmotd;
 
 	// use generic drawer for cursor, items and title
 	M_DrawGenericMenu();
@@ -6694,6 +6693,7 @@ static void M_DrawRoomMenu(void)
 
 	rmotd = V_WordWrap(0, 20*8, 0, rmotd);
 	V_DrawString(144+8, 32, V_ALLOWLOWERCASE|V_RETURN8, rmotd);
+	Z_Free(rmotd);
 }
 
 static void M_DrawConnectMenu(void)
@@ -7325,21 +7325,48 @@ static void M_DrawSetupMultiPlayerMenu(void)
 	M_DrawGenericMenu();
 
 	// draw name string
-	M_DrawTextBox(mx + 90, my - 8, MAXPLAYERNAME, 1);
-	V_DrawString(mx + 98, my, V_ALLOWLOWERCASE, setupm_name);
+	M_DrawTextBox(mx - 4, my + 12,/* MAXPLAYERNAME*/ 32, 1);
+	V_DrawString(mx + 8, my + 20, V_ALLOWLOWERCASE, setupm_name);
 
 	// draw skin string
-	V_DrawString(mx + 90, my + 96,
+	V_DrawRightAlignedString(mx + 264, my + 40,
 		((MP_PlayerSetupMenu[2].status & IT_TYPE) == IT_SPACE ? V_TRANSLUCENT : 0)|V_YELLOWMAP|V_ALLOWLOWERCASE,
 		skins[setupm_fakeskin].realname);
 
 	// draw the name of the color you have chosen
 	// Just so people don't go thinking that "Default" is Green.
-	V_DrawString(208, 72, V_YELLOWMAP|V_ALLOWLOWERCASE, Color_Names[setupm_fakecolor]);
+	V_DrawRightAlignedString(296, 138, V_YELLOWMAP|V_ALLOWLOWERCASE, Color_Names[setupm_fakecolor]);
 
 	// draw text cursor for name
 	if (!itemOn && skullAnimCounter < 4) // blink cursor
-		V_DrawCharacter(mx + 98 + V_StringWidth(setupm_name, 0), my, '_', false);
+		V_DrawCharacter(mx + 8 + V_StringWidth(setupm_name, 0), my + 20, '_', false);
+
+// 2.2 color bar code ported from Kart
+#define charw 74
+#define indexwidth 8
+	{
+		const INT32 colwidth = (278-charw)/(2*indexwidth);
+		INT32 i = -colwidth;
+		INT16 col = setupm_fakecolor - colwidth;
+		INT32 x = mx-3;
+		INT32 w = indexwidth;
+		UINT8 h;
+
+		while (col < 1)
+			col += MAXSKINCOLORS-1;
+		while (i <= colwidth)
+		{
+			if (!(i++))
+				w = charw;
+			else
+				w = indexwidth;
+			for (h = 0; h < 16; h++)
+				V_DrawFill(x, my+132+h, w, 1, colortranslations[col][h]);
+			if (++col >= MAXSKINCOLORS)
+				col -= MAXSKINCOLORS-1;
+			x += w;
+		}
+	}
 
 
 
@@ -7377,7 +7404,7 @@ static void M_DrawSetupMultiPlayerMenu(void)
 		flags |= V_FLIP; // This sprite is left/right flipped!
 
 	// draw box around guy
-	M_DrawTextBox(mx + 90, my + 8, PLBOXW, PLBOXH);
+	M_DrawTextBox(mx + 90, my + 44, PLBOXW, PLBOXH);
 
 	// draw player sprite
 	if (!setupm_fakecolor) // should never happen but hey, who knows
@@ -7385,12 +7412,12 @@ static void M_DrawSetupMultiPlayerMenu(void)
 		if (skins[setupm_fakeskin].flags & SF_HIRES)
 		{
 			V_DrawSciencePatch((mx + 98 + (PLBOXW * 8 / 2)) << FRACBITS,
-				(my + 16 + (PLBOXH * 8) - 12) << FRACBITS,
+				(my + 52 + (PLBOXH * 8) - 12) << FRACBITS,
 				flags, patch,
 				skins[setupm_fakeskin].highresscale);
 		}
 		else
-			V_DrawScaledPatch(mx + 98 + (PLBOXW * 8 / 2), my + 16 + (PLBOXH * 8) - 12, flags, patch);
+			V_DrawScaledPatch(mx + 98 + (PLBOXW * 8 / 2), my + 8 + (PLBOXH * 8) - 12, flags, patch);
 	}
 	else
 	{
@@ -7399,12 +7426,12 @@ static void M_DrawSetupMultiPlayerMenu(void)
 		if (skins[setupm_fakeskin].flags & SF_HIRES)
 		{
 			V_DrawFixedPatch((mx + 98 + (PLBOXW * 8 / 2)) << FRACBITS,
-				(my + 16 + (PLBOXH * 8) - 12) << FRACBITS,
+				(my + 52 + (PLBOXH * 8) - 12) << FRACBITS,
 				skins[setupm_fakeskin].highresscale,
 				flags, patch, colormap);
 		}
 		else
-			V_DrawMappedPatch(mx + 98 + (PLBOXW * 8 / 2), my + 16 + (PLBOXH * 8) - 12, flags, patch, colormap);
+			V_DrawMappedPatch(mx + 98 + (PLBOXW * 8 / 2), my + 52 + (PLBOXH * 8) - 12, flags, patch, colormap);
 
 		Z_Free(colormap);
 	}
@@ -7429,12 +7456,12 @@ static void M_HandleSetupMultiPlayer(INT32 choice)
 		break;
 
 	case KEY_LEFTARROW:
-		if (itemOn == 2)       //player skin
+		if (itemOn == 1)       //player skin
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakeskin--;
 		}
-		else if (itemOn == 1) // player color
+		else if (itemOn == 2) // player color
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakecolor--;
@@ -7442,12 +7469,12 @@ static void M_HandleSetupMultiPlayer(INT32 choice)
 		break;
 
 	case KEY_RIGHTARROW:
-		if (itemOn == 2)       //player skin
+		if (itemOn == 1)       //player skin
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakeskin++;
 		}
-		else if (itemOn == 1) // player color
+		else if (itemOn == 2) // player color
 		{
 			S_StartSound(NULL, sfx_menu1); // Tails
 			setupm_fakecolor++;

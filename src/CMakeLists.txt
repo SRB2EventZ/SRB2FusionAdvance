@@ -7,8 +7,6 @@ target_sourcefile(c)
 target_sources(SRB2SDL2 PRIVATE comptime.c md5.c config.h.in)
 
 ### Configuration
-set(SRB2_CONFIG_HAVE_BLUA ON CACHE BOOL
-	"Enable Lua interpreter support")
 set(SRB2_CONFIG_HAVE_PNG ON CACHE BOOL
 	"Enable PNG support. Depends on zlib, so will be disabled if you don't enable that too.")
 set(SRB2_CONFIG_HAVE_ZLIB ON CACHE BOOL
@@ -25,6 +23,8 @@ set(SRB2_CONFIG_STATIC_OPENGL OFF CACHE BOOL
 	"Use statically linked OpenGL. NOT RECOMMENDED.")
 set(SRB2_CONFIG_DEDICATED OFF CACHE BOOL
 	"Build a dedicated server.")
+set(SRB2_CONFIG_DEBUGMODE OFF CACHE BOOL
+	"Build a version with additional debug information.")
 
 if(${SRB2_CONFIG_DEDICATED})
 	set(SRB2_CONFIG_HAVE_GME NO)
@@ -38,7 +38,6 @@ if(${CMAKE_SYSTEM} MATCHES "Windows") ###set on Windows only
 	"Use SRB2's internal copies of required dependencies (SDL2, PNG, zlib, GME, OpenMPT).")
 endif()
 
-add_definitions(-DHAVE_BLUA)
 add_subdirectory(blua)
 
 if(${SRB2_CONFIG_HAVE_GME})
@@ -179,6 +178,12 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 target_compile_definitions(SRB2SDL2 PRIVATE -DCMAKECONFIG)
+
+if(${SRB2_CONFIG_DEBUGMODE})
+	target_compile_definitions(SRB2SDL2 PRIVATE -D_DEBUG -DPARANOIA -DRANGECHECK)
+else()
+	target_compile_definitions(SRB2SDL2 PRIVATE -DNDEBUG)
+endif()
 
 #add_library(SRB2Core STATIC
 #	${SRB2_CORE_SOURCES}
