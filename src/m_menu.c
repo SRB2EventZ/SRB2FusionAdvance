@@ -1165,7 +1165,7 @@ static menuitem_t OP_VideoOptionsMenu[] =
 	{IT_STRING | IT_CVAR,    NULL, "FPS Cap",       &cv_fpscap, 135},
 
 	#ifdef HWRENDER
-	{IT_SUBMENU|IT_STRING, NULL,   "3D Card Options...",  &OP_OpenGLOptionsDef,    150},
+	{IT_SUBMENU|IT_STRING, NULL,   "OpenGL sOptions...",  &OP_OpenGLOptionsDef,    150},
 	#endif
 };
 
@@ -1185,7 +1185,7 @@ static menuitem_t OP_OpenGLOptionsMenu[] =
 	{IT_STRING|IT_CVAR,		NULL, "Shaders",					&cv_grshaders,				 55},
 	{IT_STRING | IT_CVAR, NULL, "Min Shader Brightness", 	&cv_grsecbright, 		 65},
 	{IT_STRING|IT_CVAR,		NULL, "Lack of Perspective",		&cv_grshearing,				75},
-	{IT_STRING|IT_CVAR,         NULL, "Field of view",   &cv_grfov,            90},
+	{IT_STRING|IT_CVAR|IT_CV_SLIDER,         NULL, "Field of view",   &cv_fov,            90},
 	{IT_STRING|IT_CVAR,         NULL, "Quality",         &cv_scr_depth,        100},
 	{IT_STRING|IT_CVAR,         NULL, "Texture Filter",  &cv_grfiltermode,     110},
 	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",     &cv_granisotropicmode,120},
@@ -2077,22 +2077,33 @@ static void M_UpdateItemOn(void)
 static void M_ChangeCvar(INT32 choice)
 {
 	consvar_t *cv = (consvar_t *)currentMenu->menuitems[itemOn].itemaction;
+	char s[20];
+
+	// yea
+	choice = (choice*2-1);
 
 	if (((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_SLIDER)
 	    ||((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_INVISSLIDER)
 	    ||((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_NOMOD))
 	{
-		CV_SetValue(cv,cv->value+(choice*2-1));
+		if ((cv->flags & CV_FLOAT) && (currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_SLIDER)
+		{
+			float adjust = choice * ((cv == &cv_fov) ? 0.5f : (1.0f/16.0f)); // :)
+			sprintf(s,"%f",FIXED_TO_FLOAT(cv->value)+adjust);
+			CV_Set(cv,s);
+		}
+		else
+			CV_SetValue(cv,cv->value+choice);
 	}
 	else if (cv->flags & CV_FLOAT)
 	{
-		char s[20];
-		sprintf(s,"%f",FIXED_TO_FLOAT(cv->value)+(choice*2-1)*(1.0f/16.0f));
+		sprintf(s,"%f",FIXED_TO_FLOAT(cv->value)+choice*(1.0f/16.0f));
 		CV_Set(cv,s);
 	}
 	else
-		CV_AddValue(cv,choice*2-1);
+		CV_AddValue(cv,choice);
 }
+
 
 static boolean M_ChangeStringCvar(INT32 choice)
 {
@@ -2567,6 +2578,12 @@ boolean M_Responder(event_t *ev)
 				// detach any keys associated with the game control
 				G_ClearControlKeys(setupcontrols, currentMenu->menuitems[itemOn].alphaKey);
 				return true;
+			}
+			else if ((currentMenu->menuitems[itemOn].status & IT_TYPE) == IT_CVAR)
+			{
+ 				consvar_t *cv = (consvar_t *)currentMenu->menuitems[itemOn].itemaction;
+				if ((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_SLIDER)
+					CV_Set(cv, cv->defaultvalue);
 			}
 			// Why _does_ backspace go back anyway?
 			//currentMenu->lastOn = itemOn;
@@ -3295,6 +3312,13 @@ static void M_DrawGenericMenu(void)
 						switch (currentMenu->menuitems[i].status & IT_CVARTYPE)
 						{
 							case IT_CV_SLIDER:
+								// draws the little arrows on the left and right
+								// to indicate that it is changeable
+								if (i == itemOn)
+								{
+									V_DrawString(BASEVIDWIDTH - x - SLIDER_WIDTH - 6 - ((skullAnimCounter < 4) ? 9 : 8), y, V_YELLOWMAP, "<");
+									V_DrawString(BASEVIDWIDTH - x + ((skullAnimCounter < 4) ? 5 : 4), y, V_YELLOWMAP, ">");
+								}
 								M_DrawSlider(x, y, cv);
 							case IT_CV_NOPRINT: // color use this
 							case IT_CV_INVISSLIDER: // monitor toggles use this
@@ -3308,6 +3332,13 @@ static void M_DrawGenericMenu(void)
 								y += 16;
 								break;
 							default:
+								// draws the little arrows on the left and right
+								// to indicate that it is changeable
+								if (i == itemOn)
+								{
+									V_DrawString(BASEVIDWIDTH - x - V_StringWidth(cv->string, 0) - ((skullAnimCounter < 4) ? 9 : 8), y, V_YELLOWMAP, "<");
+									V_DrawString(BASEVIDWIDTH - x + ((skullAnimCounter < 4) ? 5 : 4), y, V_YELLOWMAP, ">");
+								}
 								V_DrawString(BASEVIDWIDTH - x - V_StringWidth(cv->string, 0), y,
 									((cv->flags & CV_CHEAT) && !CV_IsSetToDefault(cv) ? V_REDMAP : V_YELLOWMAP), cv->string);
 								break;
@@ -3573,6 +3604,13 @@ static void M_DrawCenteredMenu(void)
 						switch(currentMenu->menuitems[i].status & IT_CVARTYPE)
 						{
 							case IT_CV_SLIDER:
+								// draws the little arrows on the left and right
+								// to indicate that it is changeable
+								if (i == itemOn)
+								{
+									V_DrawString(BASEVIDWIDTH - x - SLIDER_WIDTH - 6 - ((skullAnimCounter < 4) ? 9 : 8), y, V_YELLOWMAP, "<");
+									V_DrawString(BASEVIDWIDTH - x + ((skullAnimCounter < 4) ? 5 : 4), y, V_YELLOWMAP, ">");
+								}
 								M_DrawSlider(x, y, cv);
 							case IT_CV_NOPRINT: // color use this
 								break;
@@ -3585,6 +3623,13 @@ static void M_DrawCenteredMenu(void)
 								y += 16;
 								break;
 							default:
+								// draws the little arrows on the left and right
+								// to indicate that it is changeable
+								if (i == itemOn)
+								{
+									V_DrawString(BASEVIDWIDTH - x - V_StringWidth(cv->string, 0) - ((skullAnimCounter < 4) ? 9 : 8), y, V_YELLOWMAP, "<");
+									V_DrawString(BASEVIDWIDTH - x + ((skullAnimCounter < 4) ? 5 : 4), y, V_YELLOWMAP, ">");
+								}
 								V_DrawString(BASEVIDWIDTH - x - V_StringWidth(cv->string, 0), y,
 									((cv->flags & CV_CHEAT) && !CV_IsSetToDefault(cv) ? V_REDMAP : V_YELLOWMAP), cv->string);
 								break;
@@ -5131,7 +5176,7 @@ static void M_LoadGameLevelSelect(INT32 choice)
 // ==============
 
 static INT32 saveSlotSelected = 0;
-static short menumovedir = 0;
+static INT32 menumovedir = 0;
 
 static void M_DrawLoadGameData(void)
 {
@@ -5217,6 +5262,7 @@ static void M_DrawLoadGameData(void)
 
 #define LOADBARHEIGHT SP_LoadDef.y + (LINEHEIGHT * (j+1)) + ymod
 #define CURSORHEIGHT  SP_LoadDef.y + (LINEHEIGHT*3) - 1
+
 static void M_DrawLoad(void)
 {
 	INT32 i, j;
@@ -5226,7 +5272,7 @@ static void M_DrawLoad(void)
 
 	if (menumovedir != 0) //movement illusion
 	{
-		ymod = (-(LINEHEIGHT/4))*menumovedir;
+		ymod = (-(LINEHEIGHT/4))*(menumovedir/(FRACUNIT-1));
 		offset = ((menumovedir > 0) ? -1 : 1);
 	}
 
@@ -5269,8 +5315,8 @@ static void M_DrawLoad(void)
 
 	//finishing the movement illusion
 	if (menumovedir)
-		menumovedir += ((menumovedir > 0) ? 1 : -1);
-	if (abs(menumovedir) > 3)
+		menumovedir += FixedMul((menumovedir > 0) ? FRACUNIT : -FRACUNIT, renderdeltatics);
+	if (abs(menumovedir) >= 4*FRACUNIT)
 		menumovedir = 0;
 }
 #undef LOADBARHEIGHT
@@ -5490,7 +5536,7 @@ static void M_HandleLoadSave(INT32 choice)
 			++saveSlotSelected;
 			if (saveSlotSelected >= MAXSAVEGAMES)
 				saveSlotSelected -= MAXSAVEGAMES;
-			menumovedir = 1;
+			menumovedir = FixedMul(FRACUNIT, renderdeltatics);
 			break;
 
 		case KEY_UPARROW:
@@ -5498,7 +5544,7 @@ static void M_HandleLoadSave(INT32 choice)
 			--saveSlotSelected;
 			if (saveSlotSelected < 0)
 				saveSlotSelected += MAXSAVEGAMES;
-			menumovedir = -1;
+			menumovedir = -FixedMul(FRACUNIT, renderdeltatics);
 			break;
 
 		case KEY_ENTER:
@@ -5601,13 +5647,13 @@ static void M_DrawSetupChoosePlayerMenu(void)
 	if (abs(itemOn*128*FRACUNIT - char_scroll) > 256*FRACUNIT)
 		char_scroll = itemOn*128*FRACUNIT;
 	else if (itemOn*128*FRACUNIT - char_scroll > 128*FRACUNIT)
-		char_scroll += 48*FRACUNIT;
+		char_scroll += FixedMul(48*FRACUNIT, renderdeltatics);
 	else if (itemOn*128*FRACUNIT - char_scroll < -128*FRACUNIT)
-		char_scroll -= 48*FRACUNIT;
-	else if (itemOn*128*FRACUNIT > char_scroll+16*FRACUNIT)
-		char_scroll += 16*FRACUNIT;
-	else if (itemOn*128*FRACUNIT < char_scroll-16*FRACUNIT)
-		char_scroll -= 16*FRACUNIT;
+		char_scroll -= FixedMul(48*FRACUNIT, renderdeltatics);
+	else if (itemOn*128*FRACUNIT > char_scroll+FixedMul(16*FRACUNIT, renderdeltatics))
+		char_scroll += FixedMul(16*FRACUNIT, renderdeltatics);
+	else if (itemOn*128*FRACUNIT < char_scroll-FixedMul(16*FRACUNIT, renderdeltatics))
+		char_scroll -= FixedMul(16*FRACUNIT, renderdeltatics);
 	else // close enough.
 		char_scroll = itemOn*128*FRACUNIT; // just be exact now.
 	i = (char_scroll+16*FRACUNIT)/(128*FRACUNIT);
@@ -8033,6 +8079,13 @@ static void M_DrawGenericScrollMenu(void)
 						switch (currentMenu->menuitems[i].status & IT_CVARTYPE)
 						{
 							case IT_CV_SLIDER:
+								// draws the little arrows on the left and right
+								// to indicate that it is changeable
+								if (i == itemOn)
+								{
+									V_DrawString(BASEVIDWIDTH - x - SLIDER_WIDTH - 6 - ((skullAnimCounter < 4) ? 9 : 8), y, V_YELLOWMAP, "<");
+									V_DrawString(BASEVIDWIDTH - x + ((skullAnimCounter < 4) ? 5 : 4), y, V_YELLOWMAP, ">");
+								}
 								M_DrawSlider(x, y, cv);
 							case IT_CV_NOPRINT: // color use this
 							case IT_CV_INVISSLIDER: // monitor toggles use this
@@ -8046,6 +8099,13 @@ static void M_DrawGenericScrollMenu(void)
 								y += 16;
 								break;
 							default:
+								// draws the little arrows on the left and right
+								// to indicate that it is changeable
+								if (i == itemOn)
+								{
+									V_DrawString(BASEVIDWIDTH - x - V_StringWidth(cv->string, 0) - ((skullAnimCounter < 4) ? 9 : 8), y, V_YELLOWMAP, "<");
+									V_DrawString(BASEVIDWIDTH - x + ((skullAnimCounter < 4) ? 5 : 4), y, V_YELLOWMAP, ">");
+								}
 								V_DrawString(BASEVIDWIDTH - x - V_StringWidth(cv->string, 0), y,
 									((cv->flags & CV_CHEAT) && !CV_IsSetToDefault(cv) ? V_REDMAP : V_YELLOWMAP), cv->string);
 								break;

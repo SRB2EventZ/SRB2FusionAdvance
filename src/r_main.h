@@ -27,6 +27,10 @@ extern INT32 centerx, centery;
 
 extern fixed_t centerxfrac, centeryfrac;
 extern fixed_t projection, projectiony;
+extern fixed_t fovtan;
+
+// WARNING: a should be unsigned but to add with 2048, it isn't!
+#define AIMINGTODY(a) FixedDiv((FINETANGENT((2048+(((INT32)a)>>ANGLETOFINESHIFT)) & FINEMASK)*160), fovtan)
 
 extern size_t validcount, linecount, loopcount, framecount; 
 
@@ -55,6 +59,8 @@ extern boolean renderisnewtic;
 #define LIGHTSCALESHIFT 12
 #define MAXLIGHTZ 128
 #define LIGHTZSHIFT 20
+
+#define LIGHTRESOLUTIONFIX (640*fovtan/vid.width)
 
 extern lighttable_t *scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
 extern lighttable_t *scalelightfixed[MAXLIGHTSCALE];
@@ -141,6 +147,7 @@ extern consvar_t cv_flipcam, cv_flipcam2;
 extern consvar_t cv_shadow, cv_shadowoffs, cv_shadowposition;
 extern consvar_t cv_translucency;
 extern consvar_t cv_precipdensity, cv_drawdist, cv_drawdist_nights, cv_drawdist_precip;
+extern consvar_t cv_fov;
 extern consvar_t cv_skybox;
 extern consvar_t cv_tailspickup; 
 
@@ -155,6 +162,10 @@ void R_Init(void);
 // just sets setsizeneeded true
 extern boolean setsizeneeded;
 void R_SetViewSize(void);
+
+void R_CheckViewMorph(void);
+void R_ApplyViewMorph(void);
+
 
 // do it (sometimes explicitly called)
 void R_ExecuteSetViewSize(void);

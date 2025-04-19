@@ -5787,6 +5787,8 @@ static void P_NiGHTSMovement(player_t *player)
 		else // AngleFixed(R_PointToAngle2()) results in slight inaccuracy! Don't use it unless movement is on both axises.
 			newangle = (INT16)FixedInt(AngleFixed(R_PointToAngle2(0,0, cmd->sidemove*FRACUNIT, cmd->forwardmove*FRACUNIT)));
 
+		newangle -= player->viewrollangle / ANG1;
+
 		if (newangle < 0 && moved)
 			newangle = (INT16)(360+newangle);
 	}
@@ -7735,6 +7737,8 @@ consvar_t cv_cam_orbital = {"cam_orbital", "On", CV_SAVE, CV_OnOff, NULL, 0, NUL
 
 consvar_t cv_cam2_orbital = {"cam2_orbital", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 
+consvar_t cv_viewroll = {"viewroll", "Off", CV_SAVE, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
+
 fixed_t t_cam_dist = -42;
 fixed_t t_cam_height = -42;
 fixed_t t_cam_rotate = -42;
@@ -7991,13 +7995,6 @@ boolean P_MoveChaseCamera(player_t *player, camera_t *thiscam, boolean resetcall
 	else
 	{
 		dist = camdist;
-
-		// x1.5 dist for splitscreen
-		if (splitscreen)
-		{
-			dist = FixedMul(dist, 3*FRACUNIT/2);
-			camheight = FixedMul(camheight, 3*FRACUNIT/2);
-		}
 
 		// x1.2 dist for analog
 		if (P_AnalogMove(player))
@@ -8621,6 +8618,40 @@ void P_DoPityCheck(player_t *player)
 	}
 }
 
+static void
+DoABarrelRoll (player_t *player)
+{
+	angle_t slope;
+	angle_t delta;
+
+	if (player->mo->standingslope)
+	{
+		slope = player->mo->standingslope->zangle;
+	}
+	else
+	{
+		slope = 0;
+	}
+
+	
+	if (player->mo->standingslope && cv_viewroll.value && (abs((INT32)slope) > ANGLE_11hh))
+	{
+		delta = ( player->mo->angle - player->mo->standingslope->xydirection );
+		slope = -(FixedMul(FINESINE (delta>>ANGLETOFINESHIFT), slope));
+	}
+	else
+		slope = 0;
+
+	delta = (INT32)( slope - player->viewrollangle )/ 16;
+
+	if (delta)
+		player->viewrollangle += delta;
+	else
+		player->viewrollangle  = slope;
+}
+
+
+
 //
 // P_PlayerThink
 //
@@ -9189,6 +9220,7 @@ void P_PlayerThink(player_t *player)
 
 		I_Error("I'm done!\n");
 	}*/
+	DoABarrelRoll(player);
 }
 
 //
