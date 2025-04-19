@@ -40,6 +40,7 @@ enum
 	// Tags < PU_LEVEL are not purged until freed explicitly.
 	PU_STATIC                = 1, // static entire execution time
 	PU_LUA                   = 2, // static entire execution time -- used by lua so it doesn't get caught in loops forever
+	PU_PERFSTATS   			 = 3, // static between changes to ps_samplesize cvar
 
 	PU_SOUND                 = 11, // static while playing
 	PU_MUSIC                 = 12, // static while playing
@@ -143,7 +144,12 @@ size_t Z_TagsUsage(INT32 lowtag, INT32 hightag);
 //
 // Miscellaneous functions
 //
-char *Z_StrDup(const char *in);
+#ifdef ZDEBUG
+#define Z_StrDup(s) Z_StrDup2(s, __FILE__, __LINE__)
+char *Z_StrDup2(const char *s, const char *file, INT32 line);
+#else
+char *Z_StrDup(const char *s);
+#endif
 #define Z_Unlock(p) (void)p // TODO: remove this now that NDS code has been removed
 
 #endif

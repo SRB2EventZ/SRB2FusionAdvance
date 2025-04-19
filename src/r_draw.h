@@ -60,7 +60,7 @@ extern fixed_t ds_xfrac, ds_yfrac, ds_xstep, ds_ystep;
 extern UINT8 *ds_source; // start of a 64*64 tile image
 extern UINT8 *ds_transmap;
 
-#ifdef ESLOPE
+
 typedef struct {
 	float x, y, z;
 } floatv3_t;
@@ -68,7 +68,7 @@ typedef struct {
 extern pslope_t *ds_slope; // Current slope being used
 extern floatv3_t ds_su, ds_sv, ds_sz; // Vectors for... stuff?
 extern float focallengthf, zeroheight;
-#endif
+
 
 // Variable flat sizes
 extern UINT32 nflatxshift;
@@ -111,6 +111,7 @@ void R_InitTranslationTables(void);
 UINT8* R_GetTranslationColormap(INT32 skinnum, skincolors_t color, UINT8 flags);
 void R_FlushTranslationColormapCache(void);
 UINT8 R_GetColorByName(const char *name);
+extern UINT8 colortranslations[MAXTRANSLATIONS][16];
 
 // Custom player skin translation
 void R_InitViewBuffer(INT32 width, INT32 height);
@@ -137,12 +138,10 @@ void R_DrawTranslucentColumn_8(void);
 void R_DrawTranslatedColumn_8(void);
 void R_DrawTranslatedTranslucentColumn_8(void);
 void R_DrawSpan_8(void);
-#ifdef ESLOPE
 void R_CalcTiltedLighting(fixed_t start, fixed_t end);
 void R_DrawTiltedSpan_8(void);
 void R_DrawTiltedTranslucentSpan_8(void);
 void R_DrawTiltedSplat_8(void);
-#endif
 void R_DrawSplat_8(void);
 void R_DrawTranslucentSplat_8(void);
 void R_DrawTranslucentSpan_8(void);

@@ -19,9 +19,7 @@
 #include "r_plane.h"
 #include "p_spec.h"
 #include "r_state.h"
-#ifdef POLYOBJECTS
 #include "p_polyobj.h"
-#endif
 #include "z_zone.h"
 #include "hardware/hw_main.h" //cv_grshearing
 #include "d_net.h" //MAXSPLITSCREENPLAYERS
@@ -204,7 +202,8 @@ void R_InterpolateView(player_t *player, boolean skybox, fixed_t frac)
 	// (lmps, network and use F12...)
 	if (rendermode == render_soft
 #ifdef HWRENDER
-		|| cv_grshearing.value
+		|| cv_grshearing.value == 1
+		|| (cv_grshearing.value == 2 && R_IsViewpointFirstPerson(player, skybox))
 #endif
 		)
 	{

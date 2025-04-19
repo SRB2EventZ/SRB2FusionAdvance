@@ -11,7 +11,6 @@
 /// \brief player object library for Lua scripting
 
 #include "doomdef.h"
-#ifdef HAVE_BLUA
 #include "fastcmp.h"
 #include "p_mobj.h"
 #include "d_player.h"
@@ -33,6 +32,7 @@ enum player_e
 	player_viewheight,
 	player_deltaviewheight,
 	player_bob,
+	player_viewrollangle,
 	player_aiming,
 	player_health,
 	player_pity,
@@ -147,6 +147,7 @@ static const char *const player_opt[] = {
 	"viewheight",
 	"deltaviewheight",
 	"bob",
+	"viewrollangle",
 	"aiming",
 	"health",
 	"pity",
@@ -381,6 +382,9 @@ static int player_get(lua_State *L)
 		break;
 	case player_bob:
 		lua_pushfixed(L, plr->bob);
+		break;
+	case player_viewrollangle:
+		lua_pushangle(L, plr->viewrollangle);
 		break;
 	case player_aiming:
 		lua_pushangle(L, plr->aiming);
@@ -740,6 +744,9 @@ static int player_set(lua_State *L)
 		break;
 	case player_bob:
 		plr->bob = luaL_checkfixed(L, 3);
+		break;
+	case player_viewrollangle:
+		plr->viewrollangle = luaL_checkangle(L, 3);
 		break;
 	case player_aiming:
 	{
@@ -1249,5 +1256,3 @@ int LUA_PlayerLib(lua_State *L)
 	lua_setglobal(L, "players");
 	return 0;
 }
-
-#endif
